@@ -1,3 +1,4 @@
+// unit testing c1.sol
 faucet 0xA 100
 deploy 0xC1 "test/c1.sol"
 faucet 0xC1 10

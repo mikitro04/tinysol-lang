@@ -13,6 +13,17 @@ let string_of_cli_cmd = function
   | ExecTx tx -> string_of_transaction tx
   | Assert(a,x,ev) -> "assert " ^ a ^ " " ^ x ^ " = " ^ string_of_exprval ev 
 
+let is_empty_or_comment (s : string) =
+  let len = String.length s in
+  (* skip leading spaces *)
+  let rec skip i =
+    if i >= len then true                      (* string is only spaces → empty *)
+    else if s.[i] = ' ' then skip (i + 1)
+    else if i + 1 < len && s.[i] = '/' && s.[i+1] = '/' then true
+    else false
+  in
+  skip 0
+
 let is_assert = function 
   | Assert(_) -> true
   | _ -> false

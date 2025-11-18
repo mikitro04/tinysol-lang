@@ -160,12 +160,15 @@ and string_of_var_decl = function
 
 let string_of_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then ";\n  " else "  ") ^ string_of_var_decl d) ""
 
-let string_of_fun_decl = function Proc(f,a,c,m) -> 
-    if f="constructor" then
-      "constructor " ^ f ^ "(" ^ (string_of_var_decls a) ^ ") {" ^ string_of_cmd c ^ "}\n"
-    else
-    "function " ^ f ^ "(" ^ (string_of_var_decls a) ^ ") " ^
-    string_of_modifier m ^ " " ^ 
+let string_of_fun_decl = function 
+  | Proc(f,al,c,v,p) -> 
+    "function " ^ f ^ "(" ^ (string_of_var_decls al) ^ ") " ^
+    string_of_modifier v ^ " " ^
+    (if p then "payable " else "") ^ 
+    "{" ^ string_of_cmd c ^ "}\n"
+  | Constr(al,c,p) ->       
+    "constructor " ^ "(" ^ (string_of_var_decls al) ^ ") " ^
+    (if p then "payable " else "") ^ 
     "{" ^ string_of_cmd c ^ "}\n"
 
 let string_of_fun_decls = List.fold_left (fun s d -> s ^ (if s<>"" then "  " else " ") ^ string_of_fun_decl d) ""

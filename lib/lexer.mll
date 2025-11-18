@@ -3,13 +3,12 @@ open Lexing
 open Parser
 
 exception LexerError of string
-
 }
 
 let white = [' ' '\n' '\t']+
-let letter = ['a'-'z' 'A'-'Z']
+let letter_or_underscore = ['a'-'z' 'A'-'Z' '_']
 let chr = ['a'-'z' 'A'-'Z' '0'-'9' '_']
-let id = letter chr*
+let id = letter_or_underscore chr*
 let addrlit = '0' 'x' chr+
 let num = ['0'-'9']|['1'-'9']['0'-'9']*
 let newline = '\r' | '\n' | "\r\n"
@@ -60,6 +59,7 @@ rule read_token =
   | "address" { ADDR }
   | "public" { PUBLIC }
   | "private" { PRIVATE }
+  | "payable" { PAYABLE }
   | "faucet" { FAUCET }
   | "deploy" { DEPLOY }
   | "assert" { ASSERT }

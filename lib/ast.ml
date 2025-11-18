@@ -53,12 +53,15 @@ and var_decl =
   | BoolVar of ide 
   | AddrVar of ide 
 
-and modifier = 
+and visibility = 
   | Public 
   | Private
 
+and payability = bool 
+
 and fun_decl =
-  | Proc of ide * var_decls * cmd * modifier
+  | Constr of var_decls * cmd * payability
+  | Proc of ide * var_decls * cmd * visibility * payability
 
 and var_decls = var_decl list
 

@@ -1,5 +1,6 @@
 open Ast
 open Types
+open Utils
 
 (******************************************************************************)
 (*                       Big-step semantics of expressions                    *)
@@ -134,7 +135,9 @@ let rec trace1_cmd = function
         else
           let rcv_state = { balance = amt; storage = botenv; code = None; } in
           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind a sender_state; active = rcv::st.active }
-    | Req(_) -> failwith ("TODO")
+    | Req(e) -> 
+        if eval_expr st a e = Bool true then St st 
+        else failwith "TODO: revert" 
     | Call(_,_) -> failwith "TODO"
     | ExecCall _  -> failwith "TODO"
     | Block(vdl,c) ->
@@ -220,11 +223,23 @@ let faucet (a : addr) (n : int) (st : sysstate) : sysstate =
 
 (* TODO: we should execute constructor!! *)
 
+let find_constructor (Contract(_,_,fdl)) : fun_decl option =
+  List.fold_left 
+  (fun acc fd -> match fd with
+    | Constr(al,c,p) -> if acc <> None then acc else Some (Constr(al,c,p))
+    | _ -> acc)
+  None
+  fdl
+
 let deploy_contract (a : addr) (c : contract) (st : sysstate) : sysstate =
   if exists_account st a then failwith ("deploy_contract: address " ^ a ^ " already bound in sysstate")
   else
     let as' = st.accounts |> bind a { balance=0; storage = init_storage c; code = Some c } in
-  { st with accounts = as'; active = a::st.active }
+    match find_constructor c with
+    | None -> { st with accounts = as'; active = a::st.active }
+    | Some (Constr(_,_,_)) -> 
+      { st with accounts = as'; active = a::st.active }
+    | _ -> assert(false)
 
 
 (******************************************************************************)
@@ -233,7 +248,9 @@ let deploy_contract (a : addr) (c : contract) (st : sysstate) : sysstate =
 
 let find_fun (Contract(_,_,fdl)) (f : ide) : fun_decl option =
   List.fold_left 
-  (fun acc (Proc(g,al,c,m)) -> if acc <> None || g<>f then acc else Some (Proc(g,al,c,m)))
+  (fun acc fd -> match fd with 
+    | Proc(g,al,c,v,p) -> if acc <> None || g<>f then acc else Some (Proc(g,al,c,v,p))
+    | _ -> acc)
   None
   fdl
 
@@ -249,10 +266,15 @@ let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
    vl
 
 let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
-  if not (exists_account st tx.txsender) 
-    then failwith ("sender address " ^ tx.txsender ^ " does not exist") else
-  if not (exists_account st tx.txto) 
-    then failwith ("to address " ^ tx.txto ^ " does not exist") else
+  if not (exists_account st tx.txsender) then 
+    failwith ("sender address " ^ tx.txsender ^ " does not exist") else
+  if not (exists_account st tx.txto) then match tx.txfun with
+    | "constructor" -> (match tx.txargs with 
+      Addr(code)::_ -> ( 
+        try let _ = parse_contract code in st
+        with _ -> failwith "exec_tx: calling constructor")
+      | _ -> failwith "exec_tx: the first parameter of a deploy transaction must be the contract code")
+    | _ -> failwith ("exec_tx: to address " ^ tx.txto ^ " does not exist") else
   let new_sender_balance = (st.accounts tx.txsender).balance - tx.txvalue in
   let new_sender_state = { (st.accounts tx.txsender) with balance = new_sender_balance } in
   let new_to_balance = (st.accounts tx.txto).balance + tx.txvalue in
@@ -261,7 +283,8 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
   | None -> failwith "Called address is not a contract"
   | Some src -> (match find_fun src tx.txfun with
       | None -> failwith ("Contract at address " ^ tx.txto ^ " has no function named " ^ tx.txfun)
-      | Some (Proc(_,xl,c,_)) ->
+      | Some (Proc(_,xl,c,_,_)) ->
+       (* TODO : if not payable, value = 0 *)
           let xl' =  AddrVar "msg.sender" :: xl in
           let vl' = Addr (tx.txsender) :: tx.txargs in
           let e' = bind_fargs_aargs xl' vl' in
@@ -272,8 +295,8 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
             stackenv = e' :: st.stackenv } in
           exec_cmd n_steps c tx.txto st'
           |> sysstate_of_exec_sysstate
-          |> popenv)
-
+          |> popenv
+      | _ -> failwith "exec_tx: calling constructor on a deployed contract") 
 
 let exec_tx_list (n_steps : int) (txl : transaction list) (st : sysstate) = 
   List.fold_left 

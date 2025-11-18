@@ -19,11 +19,13 @@ match Array.length(Sys.argv) with
 | 3 when Sys.argv.(1)="parse_contract" -> (match read_file Sys.argv.(2) with
       "" -> print_newline()
     | s -> s |> parse_contract |> string_of_contract |> print_string)
-(* exec_tx *)
+(* unittest *)
 | 3 when Sys.argv.(1)="unittest" ->
-  Sys.argv.(2) |> read_lines |> List.map parse_cli_cmd 
-    |> fun l -> exec_cli_cmd_list true l init_sysstate 
-    |> string_of_sysstate [] |> print_string
+  Sys.argv.(2) |> read_lines 
+  |> List.filter (fun s -> not (is_empty_or_comment s)) 
+  |> List.map parse_cli_cmd 
+  |> fun l -> exec_cli_cmd_list true l init_sysstate 
+  |> string_of_sysstate [] |> print_string
 | 2 when Sys.argv.(1)="demo" -> (match read_file "test/c1.sol" with
       "" -> print_newline()
     | src -> src |> parse_contract

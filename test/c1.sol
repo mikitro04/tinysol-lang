@@ -3,14 +3,20 @@
 contract C1 {
     int x;
     bool b;
-  
+
+    constructor() {
+        x = 1;
+    }
+
     function f1() public { 
         if (b) x = x+1;
         else b=true;
     }
 
     function f2(address a) public {
-        a.transfer(1);
+        if (this.balance > 0)
+            a.transfer(1);
+        else skip;
     }
 
     function f3(int amt) public {

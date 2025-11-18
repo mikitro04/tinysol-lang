@@ -50,6 +50,7 @@ open Ast
 %token ARGSEP
 %token PUBLIC
 %token PRIVATE
+%token PAYABLE
 
 %token FAUCET
 %token DEPLOY
@@ -68,7 +69,7 @@ open Ast
 %start <contract> contract
 %type <exprval> value
 %type <var_decl> var_decl
-%type <modifier> modifier
+%type <visibility> visibility
 %type <fun_decl> fun_decl
 %type <cmd> cmd
 %type <var_decls> formal_args
@@ -142,15 +143,19 @@ var_decl:
   | ADDR x = ID; CMDSEP { AddrVar x }
 ;
 
-modifier:
+visibility:
   | PUBLIC { Public }
   | PRIVATE { Private }
 ;
 
+payable:
+  | PAYABLE { true }
+  | /* empty */ { false }
+
 fun_decl:
-  | CONSTR; LPAREN; al = formal_args; RPAREN; LBRACE; c = cmd; RBRACE { Proc("constructor",al,c,Public) }
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; m=modifier; LBRACE; c = cmd; RBRACE { Proc(f,al,c,m) }
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; m=modifier; LBRACE; RBRACE { Proc(f,al,Skip,m) }
+  | CONSTR; LPAREN; al = formal_args; RPAREN; LBRACE; c = cmd; RBRACE { Constr(al,c,false) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; c = cmd; RBRACE { Proc(f,al,c,v,p) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; RBRACE { Proc(f,al,Skip,v,p) }
 ;
 
 cmd_test:
