@@ -253,15 +253,23 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
     then failwith ("sender address " ^ tx.txsender ^ " does not exist") else
   if not (exists_account st tx.txto) 
     then failwith ("to address " ^ tx.txto ^ " does not exist") else
-  let to_state = st.accounts tx.txto in match to_state.code with
-  | None -> failwith "Call not to a contract"
+  let new_sender_balance = (st.accounts tx.txsender).balance - tx.txvalue in
+  let new_sender_state = { (st.accounts tx.txsender) with balance = new_sender_balance } in
+  let new_to_balance = (st.accounts tx.txto).balance + tx.txvalue in
+  let new_to_state = { (st.accounts tx.txto) with balance = new_to_balance } in
+  match new_to_state.code with
+  | None -> failwith "Called address is not a contract"
   | Some src -> (match find_fun src tx.txfun with
       | None -> failwith ("Contract at address " ^ tx.txto ^ " has no function named " ^ tx.txfun)
       | Some (Proc(_,xl,c,_)) ->
           let xl' =  AddrVar "msg.sender" :: xl in
           let vl' = Addr (tx.txsender) :: tx.txargs in
           let e' = bind_fargs_aargs xl' vl' in
-          let st' = { st with stackenv = e' :: st.stackenv } in
+          let st' = { st with
+            accounts = st.accounts 
+              |> bind tx.txsender new_sender_state
+              |> bind tx.txto new_to_state; 
+            stackenv = e' :: st.stackenv } in
           exec_cmd n_steps c tx.txto st'
           |> sysstate_of_exec_sysstate
           |> popenv)
