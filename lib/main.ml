@@ -270,11 +270,12 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
   | None -> failwith "Called address is not a contract"
   | Some src -> (match find_fun src tx.txfun with
     | None when (not deploy) -> failwith ("Contract at address " ^ tx.txto ^ " has no function named " ^ tx.txfun)
-    | None -> { st with
-          accounts = st.accounts 
+    | None -> (* deploy a contract with no constructor *)
+        { accounts = st.accounts 
             |> bind tx.txsender sender_state
             |> bind tx.txto to_state; 
-          stackenv = st.stackenv }
+          stackenv = st.stackenv;
+          active = tx.txto :: st.active }
     | Some (Proc(_,xl,c,_,_))
     | Some (Constr(xl,c,_)) ->
      (* TODO : if not payable, value = 0 *)
@@ -289,11 +290,11 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
             Addr (tx.txsender) :: tx.txargs
         in
         let e' = bind_fargs_aargs xl' vl' in
-        let st' = { st with
-          accounts = st.accounts 
-            |> bind tx.txsender sender_state
-            |> bind tx.txto to_state; 
-          stackenv = e' :: st.stackenv } in
+        let st' = { accounts = st.accounts 
+                      |> bind tx.txsender sender_state
+                      |> bind tx.txto to_state; 
+                    stackenv = e' :: st.stackenv;
+                    active = if deploy then tx.txto :: st.active else st.active } in
         exec_cmd n_steps c tx.txto st'
         |> sysstate_of_exec_sysstate
         |> popenv

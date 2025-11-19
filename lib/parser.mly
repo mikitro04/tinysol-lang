@@ -179,6 +179,13 @@ transaction:
       txargs = al;
       txvalue = 0;
   } }
+  | s = ADDRLIT; COLON; c = ADDRLIT; LBRACE; VALUE; COLON; n = CONST; RBRACE; LPAREN; al = actual_args; RPAREN 
+  { { txsender = s;
+      txto = c;
+      txfun = "constructor";
+      txargs = al;
+      txvalue = int_of_string n;
+  } }
   | s = ADDRLIT; COLON; c = ADDRLIT; FIELDSEP; f = ID; LPAREN; al = actual_args; RPAREN 
   { { txsender = s;
       txto = c;

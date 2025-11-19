@@ -4,10 +4,6 @@ contract C1 {
     int x;
     bool b;
 
-    constructor() {
-        x = 1;
-    }
-
     function f1() public { 
         if (b) x = x+1;
         else b=true;
