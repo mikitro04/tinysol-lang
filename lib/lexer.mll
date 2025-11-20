@@ -64,6 +64,7 @@ rule read_token =
   | "faucet" { FAUCET }
   | "deploy" { DEPLOY }
   | "assert" { ASSERT }
+  | "revert" { REVERT }
   | id { ID (Lexing.lexeme lexbuf) }
   | addrlit { ADDRLIT (Lexing.lexeme lexbuf) }
   | num { CONST (Lexing.lexeme lexbuf) }

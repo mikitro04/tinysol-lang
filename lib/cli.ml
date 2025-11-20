@@ -11,6 +11,7 @@ let string_of_cli_cmd = function
   | Faucet(a,n) -> "faucet " ^ a ^ " " ^ string_of_int n
   | Deploy(tx,filename) -> "deploy " ^ string_of_transaction tx ^ " " ^ filename
   | CallFun tx -> string_of_transaction tx
+  | Revert tx -> "revert " ^ string_of_transaction tx
   | Assert(a,x,ev) -> "assert " ^ a ^ " " ^ x ^ " = " ^ string_of_exprval ev 
 
 let is_empty_or_comment (s : string) =
@@ -34,6 +35,10 @@ let exec_cli_cmd (cc : cli_cmd) (st : sysstate) : sysstate = match cc with
       let src = filename |> read_file 
       in st |> deploy_contract tx src
   | CallFun tx -> st |> exec_tx 1000 tx
+  | Revert tx -> (try 
+      st |> exec_tx 1000 tx 
+      |> fun _ -> failwith ("test failed: transaction " ^ string_of_transaction tx ^ " should revert") 
+    with _ -> st)
   | Assert(a,x,ev) ->
       let v = 
         if x="balance" then Int(lookup_balance a st) 

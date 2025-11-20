@@ -56,6 +56,7 @@ open Ast
 %token FAUCET
 %token DEPLOY
 %token ASSERT
+%token REVERT
 
 %left OR
 %left AND
@@ -211,6 +212,7 @@ transaction:
 
 cli_cmd:
   | tx = transaction { CallFun tx }
+  | REVERT; tx = transaction { Revert tx }
   | FAUCET; a = ADDRLIT; n = CONST { Faucet(a, int_of_string n) }
   | DEPLOY; tx = transaction; filename = STRING { Deploy(tx,filename) }
   | ASSERT; a = ADDRLIT; x = ID;  ev = value { Assert(a,x,ev) }
