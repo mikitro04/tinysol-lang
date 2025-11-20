@@ -27,6 +27,7 @@ type expr =
   | Geq of expr * expr
   | Ge of expr * expr           
   | IntCast of expr
+  | UintCast of expr
   | AddrCast of expr
 
 (* commands *)

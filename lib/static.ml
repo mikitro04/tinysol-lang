@@ -3,6 +3,9 @@ open Ast
 type exprtype = 
   | BoolT
   | IntT
+  | IntConstT
+  | UintT
+  | UintConstT
   | AddrT
 
 (* TypeError(expression, inferred type, expected type) *)
@@ -11,11 +14,11 @@ exception UndeclaredVar of ide;;
 
 let lookup_type (x : ide) (vdl : var_decl list) : exprtype option =
   if x="msg.sender" then Some AddrT
-  else if x="msg.value" then Some IntT else 
+  else if x="msg.value" then Some UintT else 
   vdl 
   |> List.map (fun vd -> match vd with
     | IntVar x -> IntT,x 
-    | UintVar x -> IntT,x
+    | UintVar x -> UintT,x
     | BoolVar x-> BoolT,x
     | AddrVar x -> AddrT,x )
   |> List.fold_left
@@ -24,17 +27,25 @@ let lookup_type (x : ide) (vdl : var_decl list) : exprtype option =
 
 let merge_var_decls old_vdl new_vdl = new_vdl @ old_vdl  
 
+let subtype t0 t1 = match t1 with
+  | UintConstT -> t0 = t1
+  | UintT -> t0 = UintConstT || t0 = t1
+  | IntConstT -> t0 = UintConstT || t0 = t1
+  | IntT -> t0 = UintConstT || t0 == IntConstT || t0 == UintT || t0 = t1
+  | _ -> t0 = t1
+
 let rec typecheck_expr (vdl : var_decl list) = function
     True -> BoolT
   | False -> BoolT
-  | IntConst _ -> IntT
+  | IntConst n when n>=0 -> UintConstT
+  | IntConst _ -> IntConstT
   | AddrConst _ -> AddrT
   | This -> AddrT (* TODO: make more coherent with Solidity *)
   | Var x -> (match lookup_type x vdl with
     | Some t -> t
     | None -> raise (UndeclaredVar x))
   | BalanceOf(e) -> (match typecheck_expr vdl e with
-        AddrT -> IntT
+        AddrT -> UintT
       | _ as t -> raise (TypeError (e,t,AddrT)))
   | Not(e) -> (match typecheck_expr vdl e with
         BoolT -> BoolT
@@ -45,13 +56,22 @@ let rec typecheck_expr (vdl : var_decl list) = function
        (BoolT,BoolT) -> BoolT
      | (t,_) when t<>BoolT -> raise (TypeError (e1,t,BoolT))
      | (_,t) -> raise (TypeError (e2,t,BoolT)))
-  | Add(e1,e2) 
-  | Sub(e1,e2) 
+  | Add(e1,e2)
   | Mul(e1,e2) ->
     (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
-       (IntT,IntT) -> IntT
-     | (t,_) when t<>IntT -> raise (TypeError (e1,t,IntT))
-     | (_,t) -> raise (TypeError (e2,t,IntT)))
+     | (UintConstT,UintConstT) -> UintConstT
+     | (t1,t2) when subtype t1 UintT && subtype t2 UintT -> UintT
+     | (t1,t2) when subtype t1 IntConstT && subtype t2 IntConstT -> IntConstT
+     | (t1,t2) when subtype t1 UintT && subtype t2 UintT -> UintT
+     | (t1,t2) when subtype t1 IntT && subtype t2 IntT -> IntT
+     | (t1,_) when t1<>IntT -> raise (TypeError (e1,t1,IntT))
+     | (_,t2) -> raise (TypeError (e2,t2,IntT)))
+  | Sub(e1,e2) ->
+    (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
+     | (t1,t2) when subtype t1 IntConstT && subtype t2 IntConstT -> IntConstT
+     | (t1,t2) when subtype t1 IntT && subtype t2 IntT -> IntT
+     | (t1,_) when t1<>IntT -> raise (TypeError (e1,t1,IntT))
+     | (_,t2) -> raise (TypeError (e2,t2,IntT)))
   | Eq(e1,e2)
   | Neq(e1,e2) ->
     (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
@@ -62,11 +82,14 @@ let rec typecheck_expr (vdl : var_decl list) = function
   | Geq(e1,e2)
   | Ge(e1,e2) ->
     (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
-       (IntT,IntT) -> BoolT
-     | (t,IntT) -> raise (TypeError (e1,t,IntT))
-     | (_,t) -> raise (TypeError (e2,t,IntT)))
+       (t1,t2) when subtype t1 IntT && subtype t2 IntT -> BoolT
+     | (t1,IntT) -> raise (TypeError (e1,t1,IntT))
+     | (_,t2) -> raise (TypeError (e2,t2,IntT)))
   | IntCast(e) -> (match typecheck_expr vdl e with
-        IntT -> IntT
+      | IntT | UintT -> IntT
+      | _ as t -> raise (TypeError (e,t,IntT)))
+  | UintCast(e) -> (match typecheck_expr vdl e with
+      | IntT | UintT -> UintT
       | _ as t -> raise (TypeError (e,t,IntT)))
   | AddrCast(e) -> (match typecheck_expr vdl e with
       | AddrT -> AddrT
@@ -77,23 +100,28 @@ let rec typecheck_expr (vdl : var_decl list) = function
 let rec typecheck_cmd (vdl : var_decl list) = function 
     | Skip -> true
     | Assign(x,e) -> 
-        typecheck_expr vdl (Var x) =
-        typecheck_expr vdl e
+        let te = typecheck_expr vdl e in
+        let tx = typecheck_expr vdl (Var x) in
+        if subtype te tx then true else raise (TypeError (e,te,tx)) 
       | Seq(c1,c2) -> 
         typecheck_cmd vdl c1 && 
         typecheck_cmd vdl c2
     | If(e,c1,c2) ->
-        typecheck_expr vdl e = BoolT &&
-        typecheck_cmd vdl c1 && 
-        typecheck_cmd vdl c2
+        let te = typecheck_expr vdl e in
+        if te = BoolT then typecheck_cmd vdl c1 && typecheck_cmd vdl c2
+        else raise (TypeError (e,te,BoolT))
     | Send(ercv,eamt) -> 
         typecheck_expr vdl ercv = AddrT &&
         typecheck_expr vdl eamt = IntT
     | Req(e) -> 
-        typecheck_expr vdl e = BoolT
+        let te = typecheck_expr vdl e in
+        if te = BoolT then true else raise (TypeError (e,te,BoolT))
+    | Block(lvdl,c) -> 
+        let vdl' = merge_var_decls vdl lvdl in
+        typecheck_cmd vdl' c
     | _ -> failwith "TODO"
 
-  
+
 let typecheck_fun (vdl : var_decl list) = function
   | Constr (al,c,_) -> typecheck_cmd (merge_var_decls vdl al) c
   | Proc (_,al,c,_,__) -> typecheck_cmd (merge_var_decls vdl al) c

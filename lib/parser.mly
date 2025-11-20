@@ -62,8 +62,9 @@ open Ast
 %left OR
 %left AND
 %nonassoc NOT
-%left EQ NEQ LEQ GEQ LE GE
+%nonassoc EQ NEQ LEQ GEQ LE GE
 %left PLUS MINUS
+%nonassoc UMINUS
 %left MUL
 
 
@@ -111,6 +112,7 @@ expr:
   | TRUE { True }
   | FALSE { False }
   | NOT; e=expr { Not e }
+  | MINUS; e=expr %prec UMINUS { Sub(IntConst 0, e) }
   | e1=expr; AND; e2=expr { And(e1,e2) }
   | e1=expr; OR; e2=expr { Or(e1,e2) }
   | e1=expr; PLUS; e2=expr { Add(e1,e2) }
@@ -123,6 +125,7 @@ expr:
   | e1=expr; GEQ; e2=expr { Geq(e1,e2) }
   | e1=expr; GE; e2=expr { Ge(e1,e2) }
   | INT; LPAREN; e=expr; RPAREN; { IntCast(e) }
+  | UINT; LPAREN; e=expr; RPAREN; { UintCast(e) }
   | ADDR; LPAREN; e=expr; RPAREN; { AddrCast(e) }
   | x = ID { Var(x) }
   | LPAREN; e = expr; RPAREN { e }

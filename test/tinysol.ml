@@ -201,7 +201,9 @@ let%test "test_exec_tx_8" = test_exec_tx
 
 
 let test_typecheck (src: string) (exp : bool)=
-  let c = parse_contract src in typecheck_contract c = exp  
+  let c = parse_contract src in 
+  try typecheck_contract c = exp
+  with _ -> not exp  
 
 let%test "test_typecheck_0" = test_typecheck 
   "contract C0 { }"
@@ -233,5 +235,82 @@ let%test "test_typecheck_7" = test_typecheck
 "contract C {
     int x;
     function f(bool x) public { x = 1; }
+}"
+false
+
+let%test "test_typecheck_8" = test_typecheck 
+"contract C {
+    int x;
+    function f() public { x = x+1; }
+}"
+true
+
+let%test "test_typecheck_9" = test_typecheck 
+"contract C {
+    int x;
+    function f() public { x = x-1; }
+}"
+true
+
+let%test "test_typecheck_10" = test_typecheck 
+"contract C {
+    uint x;
+    function f() public { x = x-1; }
+}"
+false
+
+let%test "test_typecheck_11" = test_typecheck 
+"contract C {
+    address x;
+    function f() public { x = x-1; }
+}"
+false
+
+let%test "test_typecheck_12" = test_typecheck 
+"contract C {
+    int x;
+    function f() public { x = -1; }
+}"
+true
+
+let%test "test_typecheck_13" = test_typecheck 
+"contract C {
+    uint x;
+    function f() public { x = -1; }
+}"
+false
+
+let%test "test_typecheck_14" = test_typecheck 
+"contract C {
+    uint x;
+    function f() public { x = 2-1; }
+}"
+false
+
+let%test "test_typecheck_15" = test_typecheck 
+"contract C {
+    uint x;
+    function f() public { x = 2+1; }
+}"
+true
+
+let%test "test_typecheck_16" = test_typecheck 
+"contract C {
+    uint x;
+    function f(int x) public { x = -1; }
+}"
+true
+
+let%test "test_typecheck_17" = test_typecheck 
+"contract C {
+    uint x;
+    function f(int x) public { x = -1; { bool x; x = true; } x = x+1; }
+}"
+true
+
+let%test "test_typecheck_18" = test_typecheck 
+"contract C {
+    int x;
+    function f(uint x) public { x = -1; }
 }"
 false
