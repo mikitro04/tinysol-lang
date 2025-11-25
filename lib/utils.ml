@@ -72,7 +72,8 @@ let rec vars_of_expr = function
   | False
   | IntConst _
   | AddrConst _
-  | This -> []               
+  | This 
+  | BlockNum -> []               
   | Var x -> [x]
   | BalanceOf e
   | Not e
@@ -131,6 +132,7 @@ let rec string_of_expr = function
   | IntConst n -> string_of_int n
   | AddrConst a -> "\"" ^ a ^ "\""
   | This -> "this"
+  | BlockNum -> "block.num"
   | Var x -> x
   | MapR(e1,e2) -> string_of_expr e1 ^ "[" ^ string_of_expr e2 ^ "]"
   | BalanceOf e -> string_of_expr e ^ ".balance"

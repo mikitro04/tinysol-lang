@@ -69,6 +69,7 @@ let rec typecheck_expr (vdl : var_decl list) = function
   | IntConst _ -> IntConstET
   | AddrConst _ -> AddrET
   | This -> AddrET (* TODO: make more coherent with Solidity *)
+  | BlockNum -> UintConstET
   | Var x -> (match lookup_type x vdl with
     | Some t -> t
     | None -> raise (UndeclaredVar x))

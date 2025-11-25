@@ -68,10 +68,12 @@ rule read_token =
   | "public" { PUBLIC }
   | "private" { PRIVATE }
   | "payable" { PAYABLE }
+  | "immutable" { IMMUTABLE }
   | "faucet" { FAUCET }
   | "deploy" { DEPLOY }
   | "assert" { ASSERT }
   | "revert" { REVERT }
+  | "block.number" { BLOCKNUM }
   | id { ID (Lexing.lexeme lexbuf) }
   | addrlit { ADDRLIT (Lexing.lexeme lexbuf) }
   | num { CONST (Lexing.lexeme lexbuf) }

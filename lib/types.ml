@@ -16,6 +16,7 @@ type account_state = {
 type sysstate = {
   accounts: addr -> account_state;
   stackenv: env list;
+  blocknum: int;
   active: addr list; (* set of all active addresses (for debugging)*)
 }
 
@@ -41,6 +42,7 @@ let popenv (st: sysstate) : sysstate = match st.stackenv with
     [] -> failwith "empty stack"
   | _::el -> { st with stackenv = el } 
 
+(* initial (empty) environment *)
 let botenv = fun x -> failwith ("variable " ^ x ^ " unbound")
     
 let bind x v f = fun y -> if y=x then v else f y
@@ -65,38 +67,33 @@ let exists_account (st : sysstate) (a : addr) : bool =
   try let _ = st.accounts a in true
   with _ -> false
 
-let mem_contract_state (cs : account_state) (x : ide) : bool = 
+let exists_ide_in_storage (cs : account_state) (x : ide) : bool = 
   try let _ = cs.storage x in true
   with _ -> false
 
-let mem_env (r:env) (x:ide) : bool =
-  try let _= r x in true
-  with _ -> false
-
-let update_storage (st : sysstate) (a:addr) (x:ide) (v:exprval) : sysstate = 
+let update_var (st : sysstate) (a:addr) (x:ide) (v:exprval) : sysstate = 
   let cs = st.accounts a in
-    if mem_contract_state cs x then 
+    if exists_ide_in_storage cs x then 
       let cs' = { cs with storage = bind x v cs.storage } in 
       { st with accounts = bind a cs' st.accounts }
     else failwith (x ^ " not bound in storage of " ^ a)   
 
 let update_map (st : sysstate) (a:addr) (x:ide) (k:exprval) (v:exprval) : sysstate = 
   let cs = st.accounts a in
-    if mem_contract_state cs x then 
+    if exists_ide_in_storage cs x then 
       match cs.storage x with
       | Map m ->
         let m' = bind k v m in
         let cs' = { cs with storage = bind x (Map m') cs.storage } in 
         { st with accounts = bind a cs' st.accounts }
-      | _ -> failwith ("update_map: " ^ x ^ " is not a map")
-      else failwith (x ^ " not bound in storage of " ^ a)   
+      | _ -> failwith ("update_map: " ^ x ^ " is not a mapping")
+      else failwith ("mapping " ^ x ^ " not bound in storage of " ^ a)   
 
 let update_env (st : sysstate) (x:ide) (v:exprval) : sysstate =
   let el = st.stackenv in match el with
   | [] -> failwith "Empty stack"
   | e::el' -> 
-    if mem_env e x then 
+    try let _ = e x in (* checks if ide x is bound in e *)
       let e' = bind x v e in 
       { st with stackenv = e'::el' }
-    else failwith (x ^ " not bound in env")   
-
+    with _ -> failwith (x ^ " not bound in env")

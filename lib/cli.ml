@@ -13,6 +13,7 @@ let string_of_cli_cmd = function
   | CallFun tx -> string_of_transaction tx
   | Revert tx -> "revert " ^ string_of_transaction tx
   | Assert(a,e) -> "assert " ^ a ^ " " ^ string_of_expr e 
+  | SetBlockNum(n) -> "block.number = " ^ string_of_int n
 
 let is_empty_or_comment (s : string) =
   let len = String.length s in
@@ -42,6 +43,7 @@ let exec_cli_cmd (cc : cli_cmd) (st : sysstate) : sysstate = match cc with
   | Assert(a,e) -> (match  eval_expr st a e with
     | Bool true -> st
     | _ -> failwith ("assertion violation: " ^ string_of_cli_cmd cc)) 
+  | SetBlockNum(n) -> { st with blocknum = n }
 
 let exec_cli_cmd_list (verbose : bool) (ccl : cli_cmd list) (st : sysstate) = 
   List.fold_left 

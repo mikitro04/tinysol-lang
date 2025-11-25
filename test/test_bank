@@ -19,3 +19,8 @@ revert 0xA:0xC.withdraw(21)
 assert 0xA this.balance==95
 assert 0xB this.balance==70
 assert 0xC this.balance==35
+
+0xB:0xC.withdraw(30)
+assert 0xA this.balance==95
+assert 0xB this.balance==100
+assert 0xC this.balance==5

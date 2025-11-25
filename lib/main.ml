@@ -41,6 +41,7 @@ let rec eval_expr (st : sysstate) (a : addr) = function
   | IntConst n -> Int n
   | AddrConst s -> Addr s
   | This -> Addr a
+  | BlockNum -> Int st.blocknum
   | Var x -> lookup_var a x st
   | MapR(e1,e2) -> (match eval_expr st a e1 with 
     | Map m -> m (eval_expr st a e2)
@@ -143,7 +144,7 @@ let rec trace1_cmd = function
           St (update_env st x (eval_expr st a e)) 
         (* if not, tries to update storage of a *)
         with _ -> 
-          St (update_storage st a x (eval_expr st a e)))
+          St (update_var st a x (eval_expr st a e)))
     | MapW(x,ek,ev) ->
         let k = eval_expr st a ek in 
         St (update_map st a x k (eval_expr st a ev))
@@ -220,6 +221,7 @@ let init_storage (Contract(_,vdl,_)) : ide -> exprval =
 let init_sysstate = { 
     accounts = (fun a -> failwith ("account " ^ a ^ " unbound")); 
     stackenv = [botenv];
+    blocknum = 0;
     active = []; 
 }
 
@@ -321,6 +323,7 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
             |> bind tx.txsender sender_state
             |> bind tx.txto to_state; 
           stackenv = st.stackenv;
+          blocknum = 0;
           active = tx.txto :: st.active }
     | Some (Proc(_,xl,c,_,p))
     | Some (Constr(xl,c,p)) ->
@@ -342,6 +345,7 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
                       |> bind tx.txsender sender_state
                       |> bind tx.txto to_state; 
                     stackenv = e' :: st.stackenv;
+                    blocknum = 0;
                     active = if deploy then tx.txto :: st.active else st.active } in
         match exec_cmd n_steps c tx.txto st' with
           St st'' -> st'' |> popenv

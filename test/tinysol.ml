@@ -58,13 +58,22 @@ let%test "test_parse_cmd_8" = test_parse_cmd
   Add (MapR (Var "m", Add (MapR (Var "m", IntConst 1), IntConst 2)),
    IntConst 3))))
 
-let%test "test_parse_cmd_9" = try 
-  let _ = parse_cmd
+  
+let%test "test_parse_contract_1" = try 
+  let _ = parse_contract
     "contract C {
         function f(mapping (uint => uint) m) public { m[0] = 1; }
     }"
   in false 
   with _ -> true
+
+let%test "test_parse_contract_2" = try
+  parse_contract
+  "contract C { uint x; function f() public { x = block.number; } }"
+  = 
+  (Contract ("C", [(VarT UintBT, "x")],
+  [Proc ("f", [], Assign ("x", BlockNum), Public, false)]))
+  with _ -> false
 
 (********************************************************************************
  test_trace_cmd : (command, n_steps, variable, expected value after n_steps)
@@ -114,8 +123,6 @@ let%test "test_trace_cmd_11" = test_trace_cmd
 
 let%test "test_trace_cmd_12" = test_trace_cmd
   ("{ int x; bool b; if (b) x=2; else b=true; skip; }", 2, "x", Int 0)  
-
-
 
 
 (********************************************************************************

@@ -59,11 +59,13 @@ open Ast
 %token PUBLIC
 %token PRIVATE
 %token PAYABLE
+%token IMMUTABLE
 
 %token FAUCET
 %token DEPLOY
 %token ASSERT
 %token REVERT
+%token BLOCKNUM
 
 %left OR
 %left AND
@@ -117,6 +119,7 @@ expr:
   | e=expr; FIELDSEP; BALANCE { BalanceOf(e) }
   | TRUE { True }
   | FALSE { False }
+  | BLOCKNUM { BlockNum }
   | NOT; e=expr { Not e }
   | MINUS; e=expr %prec UMINUS { Sub(IntConst 0, e) }
   | e1=expr; AND; e2=expr { And(e1,e2) }
@@ -175,35 +178,40 @@ base_type:
   | INT  { IntBT  }
   | UINT { UintBT }
   | BOOL { BoolBT }
-  | ADDR { AddrBT }
+  | ADDR; opt_payable { AddrBT }
 
-optional_id:
+opt_id:
   | ID { }
   | /* empty */ { }
 
+opt_payable:
+  | PAYABLE { true }
+  | /* empty */ { false }
+
+opt_immutable:
+  | IMMUTABLE { true }
+  | /* empty */ { false }
+
 var_type:
   | t = base_type { VarT(t) }
-  | MAPPING; LPAREN; t1 = base_type; optional_id; MAPSTO; t2 = base_type; optional_id; RPAREN { MapT(t1,t2) }
+  | MAPPING; LPAREN; t1 = base_type; opt_id; MAPSTO; t2 = base_type; opt_id; RPAREN { MapT(t1,t2) }
 
 var_decl:
-  | t = var_type; x = ID; CMDSEP { t,x }
+  | t = var_type; opt_immutable; x = ID; CMDSEP { t,x }
 ;
+(* TODO: add immutable and payable in ast *)
 
 visibility:
   | PUBLIC { Public }
   | PRIVATE { Private }
 ;
 
-payable:
-  | PAYABLE { true }
-  | /* empty */ { false }
-  
 fun_decl:
-  | CONSTR; LPAREN; al = formal_args; RPAREN; p = payable; LBRACE; RBRACE { Constr(al,Skip,p) }
-  | CONSTR; LPAREN; al = formal_args; RPAREN; p = payable; LBRACE; c = cmd; RBRACE { Constr(al,c,p) }
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; c = cmd; RBRACE { Proc(f,al,c,v,p) }
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; vdl = list(var_decl); c = cmd; RBRACE { Proc(f,al,Block(vdl,c),v,p) }
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; RBRACE { Proc(f,al,Skip,v,p) }
+  | CONSTR; LPAREN; al = formal_args; RPAREN; p = opt_payable; LBRACE; RBRACE { Constr(al,Skip,p) }
+  | CONSTR; LPAREN; al = formal_args; RPAREN; p = opt_payable; LBRACE; c = cmd; RBRACE { Constr(al,c,p) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = opt_payable; LBRACE; c = cmd; RBRACE { Proc(f,al,c,v,p) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = opt_payable; LBRACE; vdl = list(var_decl); c = cmd; RBRACE { Proc(f,al,Block(vdl,c),v,p) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = opt_payable; LBRACE; RBRACE { Proc(f,al,Skip,v,p) }
 ;
 
 formal_args:
@@ -213,7 +221,7 @@ formal_arg:
   | INT;  x = ID { VarT(IntBT),x }
   | UINT; x = ID { VarT(UintBT),x }
   | BOOL; x = ID { VarT(BoolBT),x }
-  | ADDR; x = ID { VarT(AddrBT),x }
+  | ADDR; opt_payable; x = ID { VarT(AddrBT),x } (* TODO: handle payable *)
 ;
 
 transaction:
@@ -253,4 +261,5 @@ cli_cmd:
   | FAUCET; a = ADDRLIT; n = CONST { Faucet(a, int_of_string n) }
   | DEPLOY; tx = transaction; filename = STRING { Deploy(tx,filename) }
   | ASSERT; a = ADDRLIT; e = expr_eof; { Assert(a,e) }
+  | BLOCKNUM; TAKES; n = CONST; { SetBlockNum(int_of_string n) }
 ;

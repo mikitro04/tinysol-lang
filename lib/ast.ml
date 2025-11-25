@@ -11,6 +11,7 @@ type expr =
   | False
   | IntConst of int
   | AddrConst of addr
+  | BlockNum
   | This
   | Var of ide
   | MapR of expr * expr
@@ -56,17 +57,19 @@ and visibility =
   | Public 
   | Private
 
-and payability = bool 
-
 and fun_decl =
-  | Constr of var_decls * cmd * payability
-  | Proc of ide * var_decls * cmd * visibility * payability
+  | Constr of var_decls * cmd * bool
+  | Proc of ide * var_decls * cmd * visibility * bool
 
 and var_decls = var_decl list
 
 and fun_decls = fun_decl list
 
 type contract = Contract of ide * var_decls * fun_decls
+
+(******************************************************************************)
+(*                                   Transactions                             *)
+(******************************************************************************)
 
 (* exprval: values associated to (contract and local) variables *)
 
@@ -96,3 +99,4 @@ type cli_cmd =
   | CallFun of transaction
   | Revert of transaction
   | Assert of addr * expr
+  | SetBlockNum of int
