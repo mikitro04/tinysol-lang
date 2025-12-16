@@ -75,7 +75,7 @@ exception EnumDupName of ide
 exception EnumDupOption of ide * ide
 exception MapInLocalDecl of ide
 
-(* Pretty *)
+(* Prettyprinting of typechecker errors *)
 let string_of_typecheck_error = function
 |  TypeError(e,t1,t2) -> 
     "expression " ^ (string_of_expr e) ^ 
@@ -98,7 +98,7 @@ let exprtype_of_decltype = function
   | BoolBT        -> BoolET
   | AddrBT(b)     -> AddrET(b)
   | EnumBT _      -> UintET
-  | ContractBT _  -> AddrET(false) (* check false *)
+  | ContractBT x  -> ContractET x 
   | UnknownBT _   -> assert(false) (* should not happen after preprocessing *)
 
 (* typechecker functions take as input the list of variable declarations:

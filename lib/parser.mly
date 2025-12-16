@@ -91,7 +91,7 @@ open Cli_ast
 %nonassoc UMINUS
 %left MUL
 
-%left CMDSEP (* bart: check *)
+%left CMDSEP
 %nonassoc ELSE
 
 %start <contract> contract
@@ -155,7 +155,7 @@ expr:
   | MSGVALUE { Var("msg.value") }
   | e = expr; DOT; BALANCE { BalanceOf(e) }
   | e = expr; DOT; o = ID { match e with Var(x) -> EnumOpt(x,o) | _ -> failwith "enum parser error"}
-  | e1 = expr; LPAREN; e2 = expr; RPAREN { match e1 with Var(x) -> EnumCast(x,e2) | _ -> failwith "enum parser error"}
+  | e1 = expr; LPAREN; e2 = expr; RPAREN { match e1 with Var(x) -> UnknownCast(x,e2) | _ -> failwith "enum parser error"}
   | e_to = expr; DOT; f = ID; e_value = opt_weivalue; LPAREN; e_args = separated_list(ARGSEP, expr); RPAREN { FunCall(e_to,f,e_value,e_args) }
   | TRUE { BoolConst true }
   | FALSE { BoolConst false }

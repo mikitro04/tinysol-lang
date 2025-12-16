@@ -190,41 +190,89 @@ let blockify_contract (Contract(c,el,vdl,fdl)) =
 let exists_enum (enums : enum_decl list) (name : ide) = 
   List.exists (fun (Enum(x,_)) -> x=name) enums
 
-let enumify_base_type (enums : enum_decl list) (bt : base_type) : base_type = match bt with
+let resolve_unknown_base_type (enums : enum_decl list) (bt : base_type) : base_type = match bt with
   | UnknownBT en when exists_enum enums en -> EnumBT en
-  | UnknownBT en                           -> ContractBT en
+  | UnknownBT en                           -> ContractBT en (* TODO: check if contract name exists in file?*)
   | _ as other -> other
 
-let enumify_decls (enums : enum_decl list) (vdl : var_decl list) : var_decl list = List.map (
+let resolve_unknown_decls (enums : enum_decl list) (vdl : var_decl list) : var_decl list = List.map (
   fun (vd:var_decl) -> match vd.ty with
-    | VarT(bt)   -> { vd with ty = VarT(enumify_base_type enums bt) } 
-    | MapT(bt1,bt2) -> { vd with ty = MapT(enumify_base_type enums bt1, enumify_base_type enums bt2) }
+    | VarT(bt)   -> { vd with ty = VarT(resolve_unknown_base_type enums bt) } 
+    | MapT(bt1,bt2) -> { vd with ty = MapT(resolve_unknown_base_type enums bt1, resolve_unknown_base_type enums bt2) }
   ) 
   vdl 
 
-let enumify_local_decls (enums : enum_decl list) (vdl : local_var_decl list) : local_var_decl list = List.map (
+let resolve_unknown_local_decls (enums : enum_decl list) (vdl : local_var_decl list) : local_var_decl list = List.map (
   fun vd -> match vd.ty with
-    | VarT(bt)   -> { vd with ty = VarT(enumify_base_type enums bt) } 
-    | MapT(bt1,bt2) -> { vd with ty = MapT(enumify_base_type enums bt1, enumify_base_type enums bt2) }
+    | VarT(bt)   -> { vd with ty = VarT(resolve_unknown_base_type enums bt) } 
+    | MapT(bt1,bt2) -> { vd with ty = MapT(resolve_unknown_base_type enums bt1, resolve_unknown_base_type enums bt2) }
   ) 
   vdl 
 
 (* TODO: transform UnknownCast into EnumCast or ContractCast *)
 
-let rec enumify_cmd enums = function
-  | Block(vdl,c) -> Block(enumify_local_decls enums vdl, enumify_cmd enums c) 
-  | _ as c -> c
+let rec resolve_unknown_expr enums = function
+  | BoolConst b -> BoolConst b
+  | IntConst n -> IntConst n
+  | IntVal n -> IntVal n
+  | UintVal n -> UintVal n
+  | AddrConst a -> AddrConst a
+  | This -> This
+  | BlockNum -> BlockNum
+  | Var x -> Var x
+  | MapR(e1,e2) -> MapR(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | BalanceOf e -> BalanceOf(resolve_unknown_expr enums e)
+  | Not e -> Not(resolve_unknown_expr enums e)
+  | And(e1,e2) -> And(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2) 
+  | Or(e1,e2) -> Or(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Add(e1,e2) -> Add(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Sub(e1,e2) -> Sub(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Mul(e1,e2) -> Mul(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Eq(e1,e2) -> Eq(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Neq(e1,e2) -> Neq(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Leq(e1,e2) -> Leq(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Lt(e1,e2) -> Lt(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Geq(e1,e2) -> Geq(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Gt(e1,e2) -> Gt(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | IfE(e1,e2,e3) -> IfE(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2,resolve_unknown_expr enums e3)
+  | IntCast(e) -> IntCast(resolve_unknown_expr enums e)
+  | UintCast(e) -> UintCast(resolve_unknown_expr enums e)
+  | AddrCast(e) -> AddrCast(resolve_unknown_expr enums e)
+  | PayableCast(e) -> PayableCast(resolve_unknown_expr enums e)
+  | EnumOpt(x,o) -> EnumOpt(x,o)
+  | UnknownCast(x,e) when exists_enum enums x -> EnumCast(x,e) 
+  | UnknownCast(x,e) -> ContractCast(x,e)
+  | EnumCast(_) -> assert(false) (* should not happen during preprocessing *)
+  | ContractCast(_) -> assert(false) (* should not happen during preprocessing *) 
+  | FunCall(e_to,f,e_value,e_args) -> FunCall(resolve_unknown_expr enums e_to,f,resolve_unknown_expr enums e_value,List.map (fun e -> resolve_unknown_expr enums e) e_args) 
+  | ExecFunCall(_) -> assert(false) (* should not happen during preprocessing *) 
+ 
+let rec resolve_unknown_cmd enums = function
+  | Skip          -> Skip
+  | Decl _        -> assert(false) (* should not happen after blockify *)
+  | Assign(x,e)   -> Assign(x,resolve_unknown_expr enums e)
+  | Decons(_)     -> failwith "TODO: multiple return values"
+  | MapW(x,ek,ev) -> MapW(x,resolve_unknown_expr enums ek,resolve_unknown_expr enums ev)
+  | Seq(c1,c2)    -> Seq(resolve_unknown_cmd enums c1,resolve_unknown_cmd enums c2)
+  | If(e,c1,c2)   -> If(resolve_unknown_expr enums e,resolve_unknown_cmd enums c1,resolve_unknown_cmd enums c2)
+  | Send(e1,e2)   -> Send(resolve_unknown_expr enums e1,resolve_unknown_expr enums e2)
+  | Req(e)        -> Req(resolve_unknown_expr enums e)
+  | Return(el)    -> Return(List.map (fun e -> resolve_unknown_expr enums e) el)
+  | ExecBlock(_)  -> assert(false)
+  | ProcCall(e_to,f,e_value,e_args) -> ProcCall(resolve_unknown_expr enums e_to,f,resolve_unknown_expr enums e_value,List.map (fun e -> resolve_unknown_expr enums  e) e_args) 
+  | ExecProcCall(_) -> assert(false)
+  | Block(vdl,c)  -> Block(resolve_unknown_local_decls enums vdl, resolve_unknown_cmd enums c) 
 
-let enumify_fun enums = function
-  | Constr (al,c,p) -> Constr (enumify_local_decls enums al,enumify_cmd enums c,p)
-  | Proc (f,al,c,v,m,ret) -> Proc(f,enumify_local_decls enums al,enumify_cmd enums c,v,m,ret)
+let resolve_unknown_fun enums = function
+  | Constr (al,c,p) -> Constr (resolve_unknown_local_decls enums al,resolve_unknown_cmd enums c,p)
+  | Proc (f,al,c,v,m,ret) -> Proc(f,resolve_unknown_local_decls enums al,resolve_unknown_cmd enums c,v,m,ret)
 
-let enumify_contract (Contract(c,enums,vdl,fdl)) =
-  Contract(c,enums,enumify_decls enums vdl, List.map (fun fd -> enumify_fun enums fd) fdl)
+let resolve_unknown_contract (Contract(c,enums,vdl,fdl)) =
+  Contract(c,enums,resolve_unknown_decls enums vdl, List.map (fun fd -> resolve_unknown_fun enums fd) fdl)
 
 
 (******************************************************************************)
 (*                                  Preprocess contract                       *)
 (******************************************************************************)
 
-let preprocess_contract c = c |> blockify_contract |> enumify_contract 
+let preprocess_contract c = c |> blockify_contract |> resolve_unknown_contract 

@@ -160,7 +160,7 @@ and string_of_cmd = function
   | Decons(_) -> failwith "TODO: multiple return values"
   | MapW(x,ek,ev) -> x ^ "[" ^ string_of_expr ek ^ "] = " ^ string_of_expr ev ^ ";"
   | Seq(c1,c2) -> string_of_cmd c1 ^ " " ^ string_of_cmd c2
-  | If(e,c1,c2) -> "if (" ^ string_of_expr e ^ ") " ^ string_of_cmd c1 ^ " else " ^ string_of_cmd c2 ^ ""
+  | If(e,c1,c2) -> "if (" ^ string_of_expr e ^ ") { " ^ string_of_cmd c1 ^ " } else { " ^ string_of_cmd c2 ^ " }"
   | Send(e1,e2) -> string_of_expr e1 ^ ".transfer(" ^ (string_of_expr e2) ^ ");"
   | Req(e) -> "require " ^ string_of_expr e ^ ";"
   | Return el -> "return " ^ string_of_expr_list el ^ ";"
