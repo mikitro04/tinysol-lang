@@ -13,7 +13,8 @@ assert 0xA this.balance==80
 assert 0xB this.balance==70
 assert 0xC this.balance==50
 
-revert 0xA:0xC.withdraw(21)
+0xA:0xC.withdraw(21)
+assert lastReverted
 
 0xA:0xC.withdraw(15)
 assert 0xA this.balance==95

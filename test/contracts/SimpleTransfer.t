@@ -16,16 +16,19 @@ assert 0xA this.balance==90
 assert 0xC this.balance==10
 assert 0xA this.balance==90
 
-revert 0xA:0xC.withdraw{value : 10}(3)
+0xA:0xC.withdraw{value : 10}(3)
+assert lastReverted
 
-revert 0xA:0xC.withdraw(3)
+0xA:0xC.withdraw(3)
+assert lastReverted
 
 0xB:0xC.withdraw(3)
 assert 0xC this.balance==7
 assert 0xA this.balance==90
 assert 0xB this.balance==3
 
-revert 0xB:0xC.withdraw(7)
+0xB:0xC.withdraw(7)
+assert lastReverted
 
 0xB:0xC.withdraw(6)
 
@@ -33,6 +36,8 @@ assert 0xC this.balance==1
 assert 0xA this.balance==90
 assert 0xB this.balance==9
 
-revert 0xA:0xC.withdraw(8)
+0xA:0xC.withdraw(8)
+assert lastReverted
 
-revert 0xB:0xC.withdraw(1)
+0xB:0xC.withdraw(1)
+assert lastReverted
