@@ -12,10 +12,10 @@ open Utils
 type env = ide -> exprval
 
 (* contract state: persistent contract storage, preserved between calls *)
-type account_state = {
-  balance : int;
-  storage : ide -> exprval;
-  code : contract option;
+type account_state = {      (* È letteralmente la struttura di un account formata da: *)
+  balance : int;            (* Bilancio in denaro(wei) *)
+  storage : ide -> exprval; (* La memoria, che ad un identificativo associa un exprval  -> vai a lib/ast.ml (row104) *)
+  code : contract option;   (* None / Some contract --> lib/ast.ml - row 147*)
 }
 
 type frame = {
@@ -23,9 +23,9 @@ type frame = {
   locals: env list;
 }
 
-type sysstate = {
-  accounts: addr -> account_state;
-  callstack: frame list;
+type sysstate = {                   (* Stato del sistema in quel preciso istant*)
+  accounts: addr -> account_state;  (* funzione che prende una stringa(address) e restituisce un tipo account_state - row 15 *)
+  callstack: frame list;            
   blocknum: int;
   active: addr list; (* set of all active addresses (for debugging)*)
 }

@@ -11,16 +11,25 @@ type addr = string
 (* Abstract syntax of expressions *)
 
 type expr =
+  (* COSTANTI: Quello che scrivi nel codice *)
   | BoolConst of bool
   | IntConst of int
-  | IntVal of int       (* runtime only: integer expressions *)
-  | UintVal of int      (* runtime only: unsigned integer expressions *)
   | AddrConst of addr
-  | BlockNum
-  | This
-  | Var of ide
-  | MapR of expr * expr
-  | BalanceOf of expr
+
+  (* VALORI RUNTIME: Questi non li scrivi nel codice .sol, ma servono al programma mentre gira per ricordarsi quanto vale un calcolo fatto *)
+  | IntVal of int       (* runtime only: integer expressions *)             (* valore computato di un'espressione e.g.(3+(-5)) *)
+  | UintVal of int      (* runtime only: unsigned integer expressions *)    (* valore computato di un'espressione e.g.(3+5) *)
+  
+  (* VARIABILI E AMBIENTE *)
+  | BlockNum            (* es: block.number (a che blocco siamo?) *)
+  | This                (* rappresenta il contratto attuale *)
+  | Var of ide          (* stringa che rappresenta il nome della variabile *)
+  | BalanceOf of expr   (* es Solidity: x.balance (quanti soldi ha x?) *) (* es OCaml: balance(x) *)
+
+  | MapR of expr * expr (* Map Reader: tipo che richiede due valori tipo expr: NomeMappa * Chiave *) (* MapR(m, k) => m[k] *)
+                        (* Più flessibile, computa expr fino a farlo diventare una stringa, cioè l'identificativo della variabile a cui accedere *)
+
+  (* OPERAZIONI MATEMATICHE E LOGICHE *)
   | Not of expr
   | And of expr * expr
   | Or of expr * expr
@@ -28,24 +37,28 @@ type expr =
   | Sub of expr * expr
   | Mul of expr * expr
   | Div of expr * expr
-  | Eq of expr * expr
-  | Neq of expr * expr
-  | Leq of expr * expr
-  | Lt of expr * expr           
-  | Geq of expr * expr
-  | Gt of expr * expr
-  | IfE of expr * expr * expr           
-  | IntCast of expr
-  | UintCast of expr
-  | AddrCast of expr
-  | PayableCast of expr
-  | EnumOpt of ide * ide
-  | UnknownCast of ide * expr
-  | EnumCast of ide * expr
-  | ContractCast of ide * expr
+  | Eq of expr * expr           (* equal == *)
+  | Neq of expr * expr          (* not equal != *)
+  | Leq of expr * expr          (* less equal <= *)
+  | Lt of expr * expr           (* less then < *)
+  | Geq of expr * expr          (* greater equal >= *)
+  | Gt of expr * expr           (* greater then > *)
+  | IfE of expr * expr * expr   (* If then Else: if(expr) then expr else expr *)
+  
+  (* Expression casting *)
+  | IntCast of expr             (*  *)
+  | UintCast of expr            (*  *)
+  | AddrCast of expr            (*  *)
+  | PayableCast of expr         (*  *)
+  | EnumOpt of ide * ide        (*  *)
+  | UnknownCast of ide * expr   (*  *)
+  | EnumCast of ide * expr      (*  *)
+  | ContractCast of ide * expr  (*  *)
+
+  (* Function calls *)
   | FunCall of expr * ide * expr * expr list
   | ExecFunCall of cmd
-  
+    
 (* Abstract syntax of commands *)
           
 and cmd =
@@ -117,12 +130,12 @@ and exprval =
 
 (* Visibility modifiers *)
 
-and var_decl = { 
-  ty: var_type; 
-  name: ide; 
-  visibility: visibility_t; 
-  mutability: var_mutability_t; 
-  init_value: exprval option 
+and var_decl = {                (* (IntBT/..) (x/IDE) (public/private/external) (view/pure) (Some(bool/int/..)/None)*) (* --> *) (*int g public view; / int g public view = ..; *)
+  ty: var_type;                 (* Tipo della variabile *)
+  name: ide;                    (* Identificativo della variabile *)
+  visibility: visibility_t;     (* Visibilità della variabile *)
+  mutability: var_mutability_t; (*  *)
+  init_value: exprval option    
 }
 
 and local_var_decl = { ty: var_type; name: ide; }
@@ -144,7 +157,7 @@ type enum_decl = Enum of (ide * ide list)
  - a list of variable declarations (contract state variables)
  - a list of function declarations 
  *)
-type contract = Contract of ide * enum_decl list * var_decl list * fun_decl list
+type contract = Contract of ide * enum_decl list * var_decl list * fun_decl list    (*  *)
 
 
 (******************************************************************************)
