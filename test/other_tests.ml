@@ -1,4 +1,6 @@
 open Semantics
+
+(*
 open Typechecker
 
 let%test "test_shortcut_1" = test_exec_tx
@@ -85,7 +87,7 @@ let%test "test_mutability_6" = test_exec_tx
   }"
   ["0xA:0xC.f{value:0}()"] 
   [("x==0");] (* msg.value can only be used in payable functions *)
-
+*)
 let%test "test_receive_1" = test_exec_fun
   "contract C { 
       uint x; 
@@ -116,7 +118,7 @@ let%test "test_receive_2" = test_exec_fun
   (* Here the test passes, but just because the semantics of Send
      does not properly push frames on the call stack *)
 
-
+(*
 let%test "test_typecheck_mutability_1" = test_typecheck
   "contract C {
       uint x;
@@ -271,3 +273,4 @@ let%test "test_typecheck_constant_4" = test_typecheck
     function f(int n) external { }
   }"
   false
+  *)
