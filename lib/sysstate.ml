@@ -15,19 +15,19 @@ type env = ide -> exprval
 type account_state = {      (* È letteralmente la struttura di un account formata da: *)
   balance : int;            (* Bilancio in denaro(wei) *)
   storage : ide -> exprval; (* La memoria, che ad un identificativo associa un exprval  -> vai a lib/ast.ml (row104) *)
-  code : contract option;   (* None / Some contract --> lib/ast.ml - row 147*)
+  code : contract option;   (* None / Some contract --> lib/ast.ml - row 160 *)
 }
 
 type frame = {
-  callee: addr;
-  locals: env list;
+  callee: addr;         (* address del contratto chiamato *)
+  locals: env list;     (* lista degli ambienti *)
 }
 
 type sysstate = {                   (* Stato del sistema in quel preciso istant*)
   accounts: addr -> account_state;  (* funzione che prende una stringa(address) e restituisce un tipo account_state - row 15 *)
-  callstack: frame list;            
-  blocknum: int;
-  active: addr list; (* set of all active addresses (for debugging)*)
+  callstack: frame list;            (* stack di frame, con il frame in cima che rappresenta la chiamata attiva *)
+  blocknum: int;                    (* numero del blocco corrente *)
+  active: addr list;                (* set of all active addresses (for debugging)*)
 }
 
 (* execution state of a command *)
@@ -177,6 +177,7 @@ let update_map (st : sysstate) (x:ide) (k:exprval) (v:exprval) : sysstate =
 (*              Retrieving contracts and functions from state                 *)
 (******************************************************************************)
 
+
 let find_fun_in_contract (Contract(_,_,_,fdl)) (f : ide) : fun_decl option =
   List.fold_left 
   (fun acc fd -> match fd with
@@ -190,8 +191,8 @@ let find_fun_in_sysstate (st : sysstate) (a : addr) (f : ide) =
   if not (exists_account st a) then
     failwith ("address " ^ a ^ " does not exist")
   else match (st.accounts a).code with
-    | None -> None  (* "address " ^ a ^ " is not a contract address" *)
-    | Some(c) -> find_fun_in_contract c f 
+    | None -> None  (* "address " ^ a ^ " is not a contract address" *) (* È un account address *)
+    | Some(c) -> find_fun_in_contract c f  (* È un CONTRACT ADDRESS *) (* da utilizzare per la receive *)
 
 let get_cmd_from_fun = function
   | (Constr(_,c,_)) -> c

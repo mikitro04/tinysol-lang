@@ -346,18 +346,19 @@ and step_cmd = function
         let (e', st') = step_expr (e, st) in
         CmdSt(If(e',c1,c2), st')
 
-    | Send(ercv,eamt) when is_val ercv && is_val eamt -> 
-        let rcv = addr_of_expr ercv in 
-        let amt = int_of_expr eamt in
-        let from = (List.hd st.callstack).callee in 
-        let from_bal = (st.accounts from).balance in
-        if from_bal<amt then Reverted "insufficient balance" else
-        let from_state =  { (st.accounts from) with balance = from_bal - amt } in
-        if exists_account st rcv then
-          let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in
-           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state}
-        else
-          let rcv_state = { balance = amt; storage = botenv; code = None; } in
+    | Send(ercv,eamt) when is_val ercv && is_val eamt -> (* quando sono validi ercv e eamt *)
+        let rcv = addr_of_expr ercv in (* address del destinatario in formato stringa (0x46367...)*)
+        let amt = int_of_expr eamt in  (* quantità di Wei in int *)
+        let from = (List.hd st.callstack).callee in (* from = identificatore dell'Address del chiamante (Stringa) *)
+        let from_bal = (st.accounts from).balance in (* balance totale del chiamante *)
+        if from_bal < amt then Reverted "insufficient balance" else (* controllo, se cerca di inviare più Wei di quanti ne possegga -> Revert *)
+        let from_state =  { (st.accounts from) with balance = from_bal - amt } in (* account del chiamante con il balance scalato *)
+        if exists_account st rcv then (* se esiste l'account del destinatario: *)
+          let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
+           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state}  (* return del sysstate con i due account aggiornati *)
+        else (* se non esiste l'account del destinatario: *)
+          let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
+          (* return del sysstate con i due account aggiornati e il debug aggiornato con il nuovo indirizzo *)
           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state; active = rcv::st.active }
 
     | Send(ercv,eamt) when is_val ercv -> 
@@ -403,20 +404,21 @@ and step_cmd = function
 
     | Decl _ -> assert(false) (* should not happen after blockify *)
 
-    | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value && List.for_all is_val e_args ->
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value && List.for_all is_val e_args -> 
+        (* espressione destinatario, identificativo funzione, espressione wei(?), lista espressioni argomenti *)
         (* retrieve function declaration *)
-        let txfrom = (List.hd (st.callstack)).callee in 
-        let txto   = addr_of_expr e_to in
-        let txvalue  = int_of_expr e_value in
-        let txargs = List.map (fun arg -> exprval_of_expr arg) e_args in
-        if lookup_balance txfrom st < txvalue then 
-          Reverted ("sender " ^ txfrom ^ " has not sufficient wei balance")
-        else
+        let txfrom = (List.hd (st.callstack)).callee in (* Mittente *)
+        let txto   = addr_of_expr e_to in (* Destinatario *)
+        let txvalue  = int_of_expr e_value in (* Valore wei(?) *)
+        let txargs = List.map (fun arg -> exprval_of_expr arg) e_args in (* Tutte le espressioni ridotte *)
+        if lookup_balance txfrom st < txvalue then (* Se il bilancio del mittente è minore del valore richiesto (in Wei) per eseguire la funzione del contratto(?) *)
+          Reverted ("sender " ^ txfrom ^ " has not sufficient wei balance") (* Fallisce *)
+        else (* Se il mittente ha abbastanza Wei per eseguire la funzione *)
         let from_state = 
-          { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
+          { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in (* Modifico lo stato del mittente col bilancio aggiornato *)
         let to_state  = 
-          { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in 
-        let fdecl = Option.get (find_fun_in_sysstate st txto f) in  
+          { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in (* Modifico lo stato del destinatario col bilancio aggiornato *)
+        let fdecl = Option.get (find_fun_in_sysstate st txto f) in (**)
         (* setup new stack frame TODO *)
         let xl = get_var_decls_from_fun fdecl in
         let xl',vl' =
@@ -526,15 +528,17 @@ let faucet (a : addr) (n : int) (st : sysstate) : sysstate =
 (******************************************************************************)
 
 let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string) result =
-  if tx.txvalue < 0 then
+  (* Condizioni di fallimento della transazione *)
+  if tx.txvalue < 0 then        (* Sto cercando di pagare 0 *)
     Error ("trying to send a negative amount of tokens")
-  else if not (exists_account st tx.txsender) then 
+  else if not (exists_account st tx.txsender) then      (* Non esiste l'account mittente *)
     Error ("sender address " ^ tx.txsender ^ " does not exist")
-  else if (st.accounts tx.txsender).balance < tx.txvalue then
+  else if (st.accounts tx.txsender).balance < tx.txvalue then   (* Il mittente sta cercando di inviare più di quanto possiede *)
     Error ("sender address " ^ tx.txsender ^ " has not sufficient balance")
-  else if not (exists_account st tx.txto) && tx.txfun <> "constructor" then
+  else if not (exists_account st tx.txto) && tx.txfun <> "constructor" then (* Se il destinatario non esiste && la funzione non è il costruttore *)
+    (* Se la l'account non esiste allora può essere direttamente creato con una transazione, ma la funzione passata alla transazione deve essere i costruttore e come argomenti bisogna passare il codice del nuovo contratto *)
     Error ("to address " ^ tx.txto ^ " does not exist")
-  else if (exists_account st tx.txto) && tx.txfun = "constructor" then
+  else if (exists_account st tx.txto) && tx.txfun = "constructor" then      (* Se l'account esiste ma si sta passando un costruttore *)
     Error ("calling constructor in already deployed contract at address " ^ tx.txto) 
   else try (
     let (sender_state : account_state) = 

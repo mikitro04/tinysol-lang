@@ -5,7 +5,7 @@ open Cli_ast
 (*                Conversion between values and expressions                   *)
 (******************************************************************************)
 
-let is_val = function
+let is_val = function (* Valido se il parametro è una costante o un valore di qualsiasi tipo, altrimenti falso *)
   | BoolConst _ 
   | IntConst _
   | IntVal _

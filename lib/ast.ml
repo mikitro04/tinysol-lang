@@ -63,18 +63,22 @@ type expr =
           
 and cmd =
   | Skip
-  | Assign of ide * expr                (* Variable assignment *)
-  | Decons of ide option list * expr    (* Deconstruction of multiple return values *)
-  | MapW of ide * expr * expr           (* Map assignment *)
-  | Seq of cmd * cmd                    (* Sequencing *)
-  | If of expr * cmd * cmd              (* Conditional command *)
-  | Send of expr * expr                 (* send(e1,e2) transfers e2 wei to e1 *)
-  | Req of expr                         (* require(e) reverts if e is false *) 
-  | Block of local_var_decl list * cmd  (* block with declarations *)
-  | ExecBlock of cmd                    (* Runtime only: c is the cmd being reduced *)
-  | Decl of local_var_decl              (* Static-time only: Decl is converted into block*)
-  | ProcCall of expr * ide * expr * expr list
-  | ExecProcCall of cmd                 (* Runtime only: c is the cmd being reduced *)
+  | Assign of ide * expr                        (* Variable assignment *)
+  | Decons of ide option list * expr            (* Deconstruction of multiple return values *)
+  | MapW of ide * expr * expr                   (* Map assignment *)
+  | Seq of cmd * cmd                            (* Sequencing *)
+  | If of expr * cmd * cmd                      (* Conditional command *)
+  | Send of expr * expr                         (* send(e1,e2) transfers e2 wei to e1 *)
+  | Req of expr                                 (* require(e) reverts if e is false *) 
+  | Block of local_var_decl list * cmd          (* block with declarations *)
+  | ExecBlock of cmd                            (* Runtime only: c is the cmd being reduced *)
+  | Decl of local_var_decl                      (* Static-time only: Decl is converted into block*)
+  | ProcCall of expr * ide * expr * expr list   (* ProcCall(to_expr, func_name, value_expr, arg_exprs):
+                                                    chiamata procedurale esterna -
+                                                    (destinatario, nome funzione, valore in wei, argomenti).
+                                                    Trasferisce valore, crea frame con `msg.sender`/`msg.value`
+                                                    e avvia l'esecuzione della funzione. *)
+  | ExecProcCall of cmd                         (* Runtime only: c is the cmd being reduced *)
   | Return of expr list
 
 (* Base types *)
@@ -146,8 +150,8 @@ and local_var_decl = { ty: var_type; name: ide; }
  *)
 
 type fun_decl =
-  | Constr of local_var_decl list * cmd * fun_mutability_t
-  | Proc of ide * local_var_decl list * cmd * visibility_t * fun_mutability_t * (base_type list) 
+  | Constr of local_var_decl list * cmd * fun_mutability_t      (* Costruttore = (dichiarazioneDiVariabiliLocali, Comando, (payable/..)) *)
+  | Proc of ide * local_var_decl list * cmd * visibility_t * fun_mutability_t * (base_type list) (* Procedura = come costruttore ma con nome identificativo e tipo di ritorno *)
 
 type enum_decl = Enum of (ide * ide list)
 
@@ -173,9 +177,9 @@ type contract = Contract of ide * enum_decl list * var_decl list * fun_decl list
  *)
 
 type transaction = {
-  txsender : addr;
-  txto : addr;
-  txfun : ide;
-  txargs : exprval list;
-  txvalue : int;
+  txsender : addr;          (* Mittente*)
+  txto : addr;              (* Destinatario *)
+  txfun : ide;              (* Nome della funzione chiamata *)
+  txargs : exprval list;    (* Argomenti della funzione chiamata *)
+  txvalue : int;            (* Valore in wei trasferito con la transazione *)
 }
