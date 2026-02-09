@@ -57,7 +57,7 @@ type expr =
 
   (* Function calls *)
   | FunCall of expr * ide * expr * expr list
-  | ExecFunCall of cmd
+  | ExecFunCall of cmd  (* Runtime only: c is the cmd being reduced *)
     
 (* Abstract syntax of commands *)
           
@@ -161,7 +161,7 @@ type enum_decl = Enum of (ide * ide list)
  - a list of variable declarations (contract state variables)
  - a list of function declarations 
  *)
-type contract = Contract of ide * enum_decl list * var_decl list * fun_decl list    (*  *)
+type contract = Contract of ide * enum_decl list * var_decl list * fun_decl list
 
 
 (******************************************************************************)

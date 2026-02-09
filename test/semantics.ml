@@ -499,11 +499,13 @@ let%test "test_proc_9" = test_exec_fun
       C c; uint x; 
       constructor() payable { c = \"0xC\"; } 
       function dp(uint amt) public { c.f{value:amt}(); }
-      function wd(uint amt) public { c.g(amt); } 
+      function wd(uint amt) public { c.g(amt); }
   }"
   ["0xA:0xD.dp(10)"; "0xA:0xD.wd(5)"] 
   [("0xC","this.balance==5"); ("0xD","this.balance==95")]
-
+(* receive() external payable { } 
+  deve essere implementata dentro D per permettere al test di passare,
+  il test adesso non passa *)
 let%test "test_fun_1" = test_exec_fun
   "contract C { function f() public returns(int) { return(1); } }"
   "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { x = c.f(); } }"

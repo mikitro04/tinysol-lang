@@ -1,7 +1,7 @@
 // unit testing c1.sol
 faucet 0xA 110
 deploy 0xA:0xC1{value : 10}() "C1" "contracts/c1.sol"
-// assert 0xC1 balance 10
+assert 0xC1 this.balance==10
 assert 0xC1 x==0
 
 0xA:0xC1.f1()

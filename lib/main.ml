@@ -186,7 +186,7 @@ let rec step_expr (e,st) = match e with
   | IfE(e1,e2,e3) when is_val e1 -> 
     let b1 = bool_of_expr e1 in ((if b1 then e2 else e3), st)
   | IfE(e1,e2,e3) -> 
-    let (e1', st') = step_expr (e1, st) in (IfE(e1',e2,e3), st')    
+    let (e1', st') = step_expr (e1, st) in (IfE(e1',e2,e3), st')
 
   | IntCast(e) when is_val e -> (match e with
     | IntConst n -> (IntConst n, st)
@@ -229,7 +229,7 @@ let rec step_expr (e,st) = match e with
     let (e', st') = step_expr (e, st) in (EnumCast(x,e'), st')    
 
   | ContractCast(_,e) when is_val e -> (match exprval_of_expr e with
-      | Addr a -> (AddrConst a, st)   
+      | Addr a -> (AddrConst a, st)
       | _ -> raise (TypeError "ContractCast: expression is not an Addr")
       )
   | ContractCast(x,e) -> 
@@ -241,12 +241,12 @@ let rec step_expr (e,st) = match e with
     let txto = addr_of_expr e_to in
     let txvalue  = int_of_expr e_value in
     let txargs = List.map (fun arg -> exprval_of_expr arg) e_args in
-    if lookup_balance txfrom st < txvalue then 
+    if lookup_balance txfrom st < txvalue then              (* nel caso il chiamante non abbia fondi sufficienti falliamo la transaction *)
       failwith ("sender has not sufficient wei balance")
     else
-    let from_state = 
+    let from_state =            (* Il bilancio del chiamante viene aggiornato con i suoi soldi - i soldi spesi per chiamare il contratto*)
       { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in
-    let to_state  = 
+    let to_state  =             (* Il bilancio del contratto viene aggiornato con i soldi ricevuti *)
       { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in 
     let fdecl = Option.get (find_fun_in_sysstate st txto f) in  
     (* setup new callstack frame *)
@@ -258,12 +258,12 @@ let rec step_expr (e,st) = match e with
       Uint txvalue :: txargs
     in
     let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in 
-    let st' = { accounts = st.accounts 
-                  |> bind txfrom from_state
-                  |> bind txto to_state; 
+    let st' = { accounts = st.accounts          (* assegnamo alla funzione/mappa accounts: *)
+                  |> bind txfrom from_state     (* txfrom a from_state *)
+                  |> bind txto to_state;        (* txto a to_state *)
                 callstack = fr' :: st.callstack;
                 blocknum = st.blocknum;
-                active = st.active } in
+                active = st.active } in         (* tutti gli indirizzi attivi, per debugging *)
     let c = get_cmd_from_fun fdecl in
     (ExecFunCall(c), st')
 
@@ -279,7 +279,7 @@ let rec step_expr (e,st) = match e with
     let (e_to', st') = step_expr (e_to, st) in
     (FunCall(e_to',f,e_value,e_args), st')
 
-  | ExecFunCall(c) -> (match step_cmd (CmdSt(c,st)) with
+  | ExecFunCall(c) -> (match step_cmd (CmdSt(c,st)) with        (* Only Runtime! *)
     | St _ -> failwith "function terminated without return"
     | Reverted s -> failwith s
     | Returned vl -> (match vl with
@@ -352,10 +352,25 @@ and step_cmd = function
         let from = (List.hd st.callstack).callee in (* from = identificatore dell'Address del chiamante (Stringa) *)
         let from_bal = (st.accounts from).balance in (* balance totale del chiamante *)
         if from_bal < amt then Reverted "insufficient balance" else (* controllo, se cerca di inviare più Wei di quanti ne possegga -> Revert *)
-        let from_state =  { (st.accounts from) with balance = from_bal - amt } in (* account del chiamante con il balance scalato *)
+        let from_state = { (st.accounts from) with balance = from_bal - amt } in (* account del chiamante con il balance scalato *)
         if exists_account st rcv then (* se esiste l'account del destinatario: *)
           let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
-           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state}  (* return del sysstate con i due account aggiornati *)
+          let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in (* return del sysstate con i due account aggiornati *)
+        (* Match di receiveState.code (contract option) *)
+            match (st.accounts rcv).code with
+            (* Some code => contratto *)
+            | Some c -> (
+                (* find_fun_in_contract, se non presente *)
+                match find_fun_in_contract c "receive" with
+                  | Some Proc(fdeclR, _, _, _, _, _) -> 
+                    CmdSt(ProcCall(ercv, fdeclR, UintVal 0, []), st')
+                  (* Reverted "receive non presente" *)
+                  | None -> Reverted "revert \n\tThe transaction has been reverted to the initial state."
+                  (*| None -> St st'*)
+                  | _ -> failwith "should not happen: receive must be a procedure"
+                )
+            | None -> St st'(* Account utente *)
+
         else (* se non esiste l'account del destinatario: *)
           let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
           (* return del sysstate con i due account aggiornati e il debug aggiornato con il nuovo indirizzo *)
@@ -396,7 +411,7 @@ and step_cmd = function
         let fr' = { fr with locals = r'::fr.locals } in
         CmdSt(ExecBlock c, { st with callstack = fr'::frl })
 
-    | ExecBlock(c) -> (match step_cmd (CmdSt(c,st)) with
+    | ExecBlock(c) -> (match step_cmd (CmdSt(c,st)) with        (* Only Runtime! *)
         | St st -> St (pop_locals st)
         | Reverted s -> Reverted s
         | Returned v -> Returned v
@@ -418,7 +433,7 @@ and step_cmd = function
           { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in (* Modifico lo stato del mittente col bilancio aggiornato *)
         let to_state  = 
           { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in (* Modifico lo stato del destinatario col bilancio aggiornato *)
-        let fdecl = Option.get (find_fun_in_sysstate st txto f) in (**)
+        let fdecl = Option.get (find_fun_in_sysstate st txto f) in
         (* setup new stack frame TODO *)
         let xl = get_var_decls_from_fun fdecl in
         let xl',vl' =
@@ -449,7 +464,7 @@ and step_cmd = function
       let (e_to', st') = step_expr (e_to, st) in 
       CmdSt(ProcCall(e_to',f,e_value,e_args), st')
 
-    | ExecProcCall(c) -> (match step_cmd (CmdSt(c,st)) with
+    | ExecProcCall(c) -> (match step_cmd (CmdSt(c,st)) with       (* Only Runtime! *)
       | St st -> St (pop_callstack st)
       | Reverted s -> Reverted s
       | Returned _ -> St (pop_callstack st)
@@ -536,7 +551,7 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
   else if (st.accounts tx.txsender).balance < tx.txvalue then   (* Il mittente sta cercando di inviare più di quanto possiede *)
     Error ("sender address " ^ tx.txsender ^ " has not sufficient balance")
   else if not (exists_account st tx.txto) && tx.txfun <> "constructor" then (* Se il destinatario non esiste && la funzione non è il costruttore *)
-    (* Se la l'account non esiste allora può essere direttamente creato con una transazione, ma la funzione passata alla transazione deve essere i costruttore e come argomenti bisogna passare il codice del nuovo contratto *)
+    (* Se l'account non esiste allora può essere direttamente creato con una transazione, ma la funzione passata alla transazione deve essere i costruttore e come argomenti bisogna passare il codice del nuovo contratto *)
     Error ("to address " ^ tx.txto ^ " does not exist")
   else if (exists_account st tx.txto) && tx.txfun = "constructor" then      (* Se l'account esiste ma si sta passando un costruttore *)
     Error ("calling constructor in already deployed contract at address " ^ tx.txto) 

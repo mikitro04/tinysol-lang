@@ -14,12 +14,12 @@ type env = ide -> exprval
 (* contract state: persistent contract storage, preserved between calls *)
 type account_state = {      (* È letteralmente la struttura di un account formata da: *)
   balance : int;            (* Bilancio in denaro(wei) *)
-  storage : ide -> exprval; (* La memoria, che ad un identificativo associa un exprval  -> vai a lib/ast.ml (row104) *)
+  storage : ide -> exprval; (* La memoria, che ad un identificativo associa un exprval -> vai a lib/ast.ml (row104) *)
   code : contract option;   (* None / Some contract --> lib/ast.ml - row 160 *)
 }
 
 type frame = {
-  callee: addr;         (* address del contratto chiamato *)
+  callee: addr;         (* address del contratto chiamante *)
   locals: env list;     (* lista degli ambienti *)
 }
 
