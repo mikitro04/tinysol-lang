@@ -1,12 +1,13 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
+// SPDX-License-Identifier: MIT
 pragma solidity >= 0.8;
 
-contract Test1 {
+contract C {
     uint x;
 
-    constructor() {
-        x = 0;
-    }
+    // Di default il valore intero viene inizializzato a 0
+    // constructor() {
+    //     x = 0;
+    // }
 
     receive() external payable {
         x += 10;
@@ -18,10 +19,13 @@ contract Test1 {
 }
 
 contract D {
-    uint y;
-    constructor() { y = 1; }
+    address cAdd;
 
-    function tr(address payable des) public payable {
-        des.transfer(1);
+    constructor(address payable cAddress_) {
+        cAdd = cAddress_;
+    }
+
+    function trasferisciDenaro() public payable {
+        payable(cAdd).transfer(1);
     }
 }

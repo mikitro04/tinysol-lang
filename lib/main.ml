@@ -357,20 +357,20 @@ and step_cmd = function
           let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
           let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in (* return del sysstate con i due account aggiornati *)
         (* Match di receiveState.code (contract option) *)
-            match (st.accounts rcv).code with
+            (match (st.accounts rcv).code with
             (* Some code => contratto *)
             | Some c -> (
                 (* find_fun_in_contract, se non presente *)
                 match find_fun_in_contract c "receive" with
                   | Some Proc(fdeclR, _, _, _, _, _) -> 
-                    CmdSt(ProcCall(ercv, fdeclR, UintVal 0, []), st')
+                    CmdSt(ProcCall(ercv, fdeclR, eamt, []), st)
                   (* Reverted "receive non presente" *)
-                  | None -> Reverted "revert \n\tThe transaction has been reverted to the initial state."
+                  | None -> Reverted "Reverted: The transaction has been reverted to the initial state."
                   (*| None -> St st'*)
                   | _ -> failwith "should not happen: receive must be a procedure"
                 )
             | None -> St st'(* Account utente *)
-
+            )
         else (* se non esiste l'account del destinatario: *)
           let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
           (* return del sysstate con i due account aggiornati e il debug aggiornato con il nuovo indirizzo *)

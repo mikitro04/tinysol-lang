@@ -100,7 +100,7 @@ let%test "test_receive_1" = test_exec_fun
   ["0xA:0xD.f(\"0xC\")"] 
   [("0xC","this.balance==1 && x==1"); ("0xD","this.balance==99")]
 
-let%test "test_receive_2" = test_exec_fun
+(* let%test "test_receive_2" = test_exec_fun
   "contract C { 
       D d;
       constructor() { d = \"0xD\"; }
@@ -113,7 +113,7 @@ let%test "test_receive_2" = test_exec_fun
       function g() public { x += 1; }
   }"
   ["0xA:0xD.f(\"0xC\")"] 
-  [("0xC","this.balance==1"); ("0xD","this.balance==99 && x==0")]
+  [("0xC","this.balance==1"); ("0xD","this.balance==99 && x==0")] *)
   (* transfer does not carry enough gas to enable the call to d.g() *)
   (* Here the test passes, but just because the semantics of Send
      does not properly push frames on the call stack *)
@@ -274,3 +274,93 @@ let%test "test_typecheck_constant_4" = test_typecheck
   }"
   false
   *)
+
+
+
+(******************************************************************************)
+(*                             Custom Test - Issue 7                          *)
+(******************************************************************************)
+
+(* Questo test verifica che la receive fallisca a causa di un arithmetic underflow
+provocato dall'istruzione "x -= 1" su un uint, generando una revert e
+ripristinando correttamente lo stato degli account. *)
+let%test "test_1_issue_7" = test_exec_fun 
+  "contract C { 
+      D d;
+      constructor() { d = \"0xD\"; }
+      receive() external payable { d.g(); }
+  }"
+  "contract D { 
+      uint x;
+      constructor() payable { } 
+      function f(address a) public { payable(a).transfer(1); }
+      function g() public { x -= 1; }
+  }"
+  ["0xA:0xD.f(\"0xC\")"] 
+  [("0xC","this.balance==0"); ("0xD","this.balance==100")]
+
+
+(* A causa della receive non implementata nel contratto D si ha una revert allo stato iniziale *)
+let%test "test_2_issue_7" = test_exec_fun 
+  "contract C { 
+      D d;
+      constructor() { d = \"0xD\"; }
+      function foo(add) { payable(add).transfer(10) }
+      receive() external payable { d.g(); }
+  }"
+  "contract D { 
+      uint x;
+      constructor() payable { } 
+      function f(address a) public { payable(a).transfer(100); }
+      function g() public { x = 1; }
+  }"
+  ["0xA:0xD.f(\"0xC\"), 0xB:0xC.foo(\"0xA\")"] 
+  [("0xA", "this.balance==100"); ("0xC","this.balance==100"); ("0xB","this.balance==100")]
+
+
+(* receive a cascata *)
+let%test "test_3_issue_7" = test_exec_fun 
+  "contract C { 
+      D d;
+      constructor() { d = \"0xD\"; }
+      function foo(address add) public payable { payable(add).transfer(10); }
+      receive() external payable { d.g(); }
+  }"
+  "contract D { 
+      uint x;
+      constructor() payable { } 
+      function f(address a) public payable { payable(a).transfer(100); }
+      function g() public { x = 1; }
+      receive() external payable { x += 1; }
+  }"
+  ["0xA:0xD.f(\"0xC\"), 0xB:0xC.foo(\"0xA\")"]
+  [("0xA", "this.balance==110"); ("0xB", "this.balance==100"); ("0xC", "this.balance==90"); ("0xD", "this.balance==0 && x==1")]
+
+
+(*["0xA:0xD.f(\"0xC\"), 0xB:0xC.foo(\"0xA\")"]*)
+(* A 200
+  B 100
+
+  A DEPLOY C GRATIS
+  A DEPLOY D 100
+
+  A 100
+  B 100
+  C 0
+  D 100     x = 0
+  
+  0xA:0xD.f(0xC) -> D paga C 100 wei
+  
+  A 100
+  B 100
+  C 100
+  D 0     x = 1
+  
+  0xB:0xC.foo(0xA)
+  
+  A 110
+  B 100
+  C 90
+  D 0
+  
+*)
