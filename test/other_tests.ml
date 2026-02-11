@@ -100,7 +100,8 @@ let%test "test_receive_1" = test_exec_fun
   ["0xA:0xD.f(\"0xC\")"] 
   [("0xC","this.balance==1 && x==1"); ("0xD","this.balance==99")]
 
-(* let%test "test_receive_2" = test_exec_fun
+(*
+let%test "test_receive_2" = test_exec_fun
   "contract C { 
       D d;
       constructor() { d = \"0xD\"; }
@@ -113,12 +114,13 @@ let%test "test_receive_1" = test_exec_fun
       function g() public { x += 1; }
   }"
   ["0xA:0xD.f(\"0xC\")"] 
-  [("0xC","this.balance==1"); ("0xD","this.balance==99 && x==0")] *)
+  [("0xC","this.balance==1"); ("0xD","this.balance==99 && x==0")]
+
   (* transfer does not carry enough gas to enable the call to d.g() *)
   (* Here the test passes, but just because the semantics of Send
      does not properly push frames on the call stack *)
 
-(*
+
 let%test "test_typecheck_mutability_1" = test_typecheck
   "contract C {
       uint x;
@@ -317,50 +319,122 @@ let%test "test_2_issue_7" = test_exec_fun
   ["0xA:0xD.f(\"0xC\"), 0xB:0xC.foo(\"0xA\")"] 
   [("0xA", "this.balance==100"); ("0xC","this.balance==100"); ("0xB","this.balance==100")]
 
-
-(* receive a cascata *)
+(* EOA payement *)
 let%test "test_3_issue_7" = test_exec_fun 
   "contract C { 
       D d;
       constructor() { d = \"0xD\"; }
-      function foo(address add) public payable { payable(add).transfer(10); }
+      function foo(address add) public { payable(add).transfer(10); }
       receive() external payable { d.g(); }
   }"
   "contract D { 
       uint x;
-      constructor() payable { } 
-      function f(address a) public payable { payable(a).transfer(100); }
+      constructor() payable { }
+      function f(address a) public { payable(a).transfer(100); }
       function g() public { x = 1; }
       receive() external payable { x += 1; }
   }"
-  ["0xA:0xD.f(\"0xC\"), 0xB:0xC.foo(\"0xA\")"]
-  [("0xA", "this.balance==110"); ("0xB", "this.balance==100"); ("0xC", "this.balance==90"); ("0xD", "this.balance==0 && x==1")]
+  ["0xA:0xD.f(\"0xC\")"; "0xB:0xC.foo(\"0xA\")"] 
+  [
+    ("0xA", "this.balance==110");
+    ("0xB", "this.balance==100");
+    ("0xC", "this.balance==90");
+    ("0xD", "this.balance==0 && x==1")
+  ]
+  
+(* Receive a cascata *)
+let%test "test_4_issue_7" = test_exec_fun 
+  "contract C { 
+      D d;
+      constructor() { d = \"0xD\"; }
+      function foo(address add) public { payable(add).transfer(10); }
+      receive() external payable { d.g(); }
+  }"
+  "contract D { 
+      uint x;
+      constructor() payable { }
+      function f(address a) public { payable(a).transfer(100); }
+      function g() public { x = 1; }
+      receive() external payable { x += 1; }
+  }"
+  ["0xA:0xD.f(\"0xC\")"; "0xB:0xC.foo(\"0xD\")"]
+  [
+    ("0xA", "this.balance==100"); 
+    ("0xB", "this.balance==100"); 
+    ("0xC", "this.balance==90"); 
+    ("0xD", "this.balance==10 && x==2")
+  ]
+
+(*
+
+DUBBIONE
+
+(* Self transfer between contracts *)
+let%test "test_5_issue_7" = test_exec_fun 
+"contract C {
+  constructor() payable { }
+}"
+"contract D {
+  uint x;
+  constructor() payable { x = 0; }
+  function f(address add) public { payable(add).transfer(25); }
+  receive() external payable { x += 1; }
+}"
+["0xA:0xD.f(\"0xD\")"]
+[
+  ("0xA", "this.balance==100");
+  ("0xD", "this.balance==100 && x==1")
+]
 
 
-(*["0xA:0xD.f(\"0xC\"), 0xB:0xC.foo(\"0xA\")"]*)
-(* A 200
-  B 100
-
-  A DEPLOY C GRATIS
-  A DEPLOY D 100
-
-  A 100
-  B 100
-  C 0
-  D 100     x = 0
-  
-  0xA:0xD.f(0xC) -> D paga C 100 wei
-  
-  A 100
-  B 100
-  C 100
-  D 0     x = 1
-  
-  0xB:0xC.foo(0xA)
-  
-  A 110
-  B 100
-  C 90
-  D 0
-  
 *)
+
+(* require condition false, Revert *)
+let%test "test_6_issue_7" = test_exec_fun 
+  "contract C { 
+      D d;
+      constructor() { d = \"0xD\"; }
+      receive() external payable { payable(d).transfer(10); }
+  }"
+  "contract D { 
+      C c;
+      int x;
+      constructor() payable { c = \"0xC\"; }
+      function foo(address a) public { 
+        payable(c).transfer(50);
+        x += 1; }
+      receive() external payable { 
+        require(msg.value > 10);
+        x += 10;
+      }
+  }"
+  ["0xA:0xD.foo()"; "0xB:0xC.foo(\"0xD\")"]
+  [
+    ("0xA", "this.balance==100"); 
+    ("0xB", "this.balance==100"); 
+    ("0xC", "this.balance==0"); 
+    ("0xD", "this.balance==100 && x==0")
+  ]
+
+
+(*bilancio aggiornato prima o dopo receive*)
+let%test "test_8_issue_7" = test_exec_fun 
+"contract C { 
+    D d;
+    uint seen;
+    constructor() { d = \"0xD\"; }
+    receive() external payable { seen = this.balance; }
+  }"
+  "contract D {
+  C c;
+  int x;
+  constructor() payable { c = \"0xC\"; }
+  function foo(address a) public { 
+    payable(c).transfer(50);}
+}"
+["0xA:0xD.foo(\"0xC\")"](*; "0xB:0xC.foo(\"0xD\")"*)
+  [
+    ("0xA", "this.balance==100"); 
+    ("0xB", "this.balance==100"); 
+    ("0xC", "this.balance==50 && seen == 50"); 
+  ]

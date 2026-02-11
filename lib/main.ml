@@ -351,30 +351,42 @@ and step_cmd = function
         let amt = int_of_expr eamt in  (* quantità di Wei in int *)
         let from = (List.hd st.callstack).callee in (* from = identificatore dell'Address del chiamante (Stringa) *)
         let from_bal = (st.accounts from).balance in (* balance totale del chiamante *)
-        if from_bal < amt then Reverted "insufficient balance" else (* controllo, se cerca di inviare più Wei di quanti ne possegga -> Revert *)
-        let from_state = { (st.accounts from) with balance = from_bal - amt } in (* account del chiamante con il balance scalato *)
-        if exists_account st rcv then (* se esiste l'account del destinatario: *)
-          let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
-          let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in (* return del sysstate con i due account aggiornati *)
-        (* Match di receiveState.code (contract option) *)
-            (match (st.accounts rcv).code with
-            (* Some code => contratto *)
-            | Some c -> (
-                (* find_fun_in_contract, se non presente *)
-                match find_fun_in_contract c "receive" with
-                  | Some Proc(fdeclR, _, _, _, _, _) -> 
-                    CmdSt(ProcCall(ercv, fdeclR, eamt, []), st)
-                  (* Reverted "receive non presente" *)
-                  | None -> Reverted "Reverted: The transaction has been reverted to the initial state."
-                  (*| None -> St st'*)
-                  | _ -> failwith "should not happen: receive must be a procedure"
-                )
-            | None -> St st'(* Account utente *)
-            )
-        else (* se non esiste l'account del destinatario: *)
-          let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
-          (* return del sysstate con i due account aggiornati e il debug aggiornato con il nuovo indirizzo *)
-          St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state; active = rcv::st.active }
+        if from_bal < amt then (* controllo, se cerca di inviare più Wei di quanti ne possegga -> Revert *)
+          Reverted "insufficient balance"
+        else 
+          let from_state = { (st.accounts from) with balance = from_bal - amt } in (* account del chiamante con il balance scalato *)
+          if exists_account st rcv then (* se esiste l'account del destinatario: *)
+            let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
+            let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in (* return del sysstate con i due account aggiornati *)
+            (* Match di receiveState.code (contract option) *)
+              (match (st.accounts rcv).code with
+                (* Some code => contratto *)
+                | Some c -> (
+                  (* find_fun_in_contract, se non presente *)
+                  match find_fun_in_contract c "receive" with
+                    | Some Proc(fdeclR, _, _, _, _, _) when from <> rcv ->                                  (* transfer tra due account diversi *)
+                      CmdSt(ProcCall(ercv, fdeclR, eamt, []), st)
+
+                    | Some Proc(fdeclR, _, _, _, _, _) ->                                                   (* self transfer *)
+                      CmdSt(ProcCall(ercv, fdeclR, UintVal 0, []), st)
+
+                    | None -> Reverted "Reverted: The transaction has been reverted to the initial state."  (* Reverted "receive non presente" *)
+
+                    | _ -> failwith "should not happen: receive must be a procedure"
+                  )
+                
+                (* EOA - Externally Owned Account *)
+                | None -> 
+                  if from = rcv then (* Self transfer between accounts => previous state *)
+                    St st
+                  else
+                    St st' (* Simple transfer between accounts (implemented?) *)
+
+              )
+          else (* se non esiste l'account del destinatario: *)
+            let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
+            (* return del sysstate con i due account aggiornati e il debug aggiornato con il nuovo indirizzo *)
+            St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state; active = rcv::st.active }
 
     | Send(ercv,eamt) when is_val ercv -> 
         let (eamt', st') = step_expr (eamt, st) in

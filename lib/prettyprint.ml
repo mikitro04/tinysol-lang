@@ -277,7 +277,7 @@ let string_of_account_state accst =
   (match accst.code with 
   | None -> ""
   | Some src -> string_of_storage accst.storage (vars_of_contract src)) ^
-  "}"
+  "};"
 
 let string_of_accounts (st : sysstate) =
   "[" ^ 
