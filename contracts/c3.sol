@@ -8,7 +8,8 @@ contract C3 {
     // test parsing of function declarations and function calls
     
     function f0() public { }
-    function f1() public { x = c.g(); }   
+    function f1() public { x = c.g(); }     // exception Failure("TODO: FunCall")
+    function f1v2() public { c.g(); }       // exception Failure("TODO: ProcCall")
     function f2() public { x = c.g{value:1+2}(1,true); }   
     function f3() public { x = c.g{value:x}(1+1); }   
     function f4() public { return x; }   

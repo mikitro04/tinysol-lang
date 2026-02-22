@@ -45,7 +45,7 @@ let (>>)  (out1 : typecheck_result) (out2 : typecheck_result) : typecheck_result
 (* the result of the expression typechecker is either:
   - Ok(t):      if all static checks passed, and t is the inferred type of the expression
   - Error log:  if some checks did not pass; the log collects all the errors found 
- *)
+*)
 
 type typecheck_expr_result = (exprtype,exn list) result
 
@@ -92,7 +92,7 @@ let string_of_typecheck_error = function
 | MultipleLocalDecl (f,x) -> logfun f "variable " ^ x ^ " is declared multiple times"
 | EnumNameNotFound (f,x) -> logfun f "enum ^ " ^ x ^ " is not declared"
 | EnumOptionNotFound (f,x,o) -> logfun f "enum option " ^ o ^ " is not found in enum " ^ x
-| EnumDupName x -> "enum " ^ x ^ " is declared multiple times"
+| EnumDupName x -> "enum " ^ x ^ " is declatred multiple times"
 | EnumDupOption (x,o) -> "enum option " ^ o ^ " is declared multiple times in enum " ^ x
 | MapInLocalDecl (f,x) -> logfun f "mapping " ^ x ^ " not admitted in local declaration" 
 | ex -> Printexc.to_string ex
@@ -392,6 +392,8 @@ let typecheck_local_decls (f : ide) (vdl : local_var_decl list) = List.fold_left
   (Ok ())
   vdl
 
+
+(* f: Identificatore della funzione / edl: lista delle dichiarazioni delle enum / vdl lista delle dichiarazioni delle variabi *)
 let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = function 
     | Skip -> Ok ()
 
@@ -404,9 +406,9 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = f
           | res1,res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
         )
 
-    | Decons(_) -> failwith "TODO: multiple return values"
+    | Decons(_) -> failwith "TODO: multiple return values"  (* Issue: 12 *)
 
-    | MapW(x,ek,ev) ->  
+    | MapW(x,ek,ev) -> 
         (match typecheck_expr f edl vdl (Var x),
                typecheck_expr f edl vdl ek,
                typecheck_expr f edl vdl ev with

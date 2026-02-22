@@ -366,11 +366,8 @@ and step_cmd = function
                 | Some c -> (
                   (* find_fun_in_contract, se non presente *)
                   match find_fun_in_contract c "receive" with
-                    | Some Proc(fdeclR, _, _, _, _, _) (*when from <> rcv*) ->                                  (*transfer tra due account diversi*)
+                    | Some Proc(fdeclR, _, _, _, _, _) ->
                       CmdSt(ProcCall(ercv, fdeclR, eamt, []), st)
-                    
-                    (* | Some Proc(fdeclR, _, _, _, _, _) ->                                                   (* self transfer *)
-                      CmdSt(ProcCall(ercv, fdeclR, eamt, []), st) *)
                     
                     | None -> Reverted "Reverted: The transaction has been reverted to the initial state."  (* Reverted "receive non presente" *)
 
@@ -379,12 +376,6 @@ and step_cmd = function
                 
                 (* EOA - Externally Owned Account *)
                 | None -> St st'
-                (*
-                  if from = rcv then (* Self transfer between accounts => previous state *)
-                    St st
-                  else
-                    St st' (* Simple transfer between accounts (implemented?) *)
-                *)
               )
           else (* se non esiste l'account del destinatario: *)
             let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
