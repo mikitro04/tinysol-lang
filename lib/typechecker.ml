@@ -393,7 +393,7 @@ let typecheck_local_decls (f : ide) (vdl : local_var_decl list) = List.fold_left
   vdl
 
 
-(* f: Identificatore della funzione / edl: lista delle dichiarazioni delle enum / vdl lista delle dichiarazioni delle variabi *)
+(* f: Identificatore della funzione / edl: lista delle dichiarazioni delle enum / vdl lista delle dichiarazioni delle variabili *)
 let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = function 
     | Skip -> Ok ()
 
