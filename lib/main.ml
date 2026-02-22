@@ -355,33 +355,36 @@ and step_cmd = function
           Reverted "insufficient balance"
         else 
           let from_state = { (st.accounts from) with balance = from_bal - amt } in (* account del chiamante con il balance scalato *)
-          if exists_account st rcv then (* se esiste l'account del destinatario: *)
-            let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
-            let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in (* return del sysstate con i due account aggiornati *)
+          let st_tmp = { st with accounts = st.accounts |> bind from from_state } in
+
+          if exists_account st_tmp rcv then (* se esiste l'account del destinatario: *)
+            let rcv_state = { (st_tmp.accounts rcv) with balance = (st_tmp.accounts rcv).balance + amt } in (* account del destinatario con il balance aggiornato *)
+            let st' = { st_tmp with accounts = st_tmp.accounts |> bind rcv rcv_state } in (* return del sysstate con i due account aggiornati *)
             (* Match di receiveState.code (contract option) *)
-              (match (st.accounts rcv).code with
+              (match (st'.accounts rcv).code with
                 (* Some code => contratto *)
                 | Some c -> (
                   (* find_fun_in_contract, se non presente *)
                   match find_fun_in_contract c "receive" with
-                    | Some Proc(fdeclR, _, _, _, _, _) when from <> rcv ->                                  (* transfer tra due account diversi *)
+                    | Some Proc(fdeclR, _, _, _, _, _) (*when from <> rcv*) ->                                  (*transfer tra due account diversi*)
                       CmdSt(ProcCall(ercv, fdeclR, eamt, []), st)
-
-                    | Some Proc(fdeclR, _, _, _, _, _) ->                                                   (* self transfer *)
-                      CmdSt(ProcCall(ercv, fdeclR, UintVal 0, []), st)
-
+                    
+                    (* | Some Proc(fdeclR, _, _, _, _, _) ->                                                   (* self transfer *)
+                      CmdSt(ProcCall(ercv, fdeclR, eamt, []), st) *)
+                    
                     | None -> Reverted "Reverted: The transaction has been reverted to the initial state."  (* Reverted "receive non presente" *)
 
                     | _ -> failwith "should not happen: receive must be a procedure"
                   )
                 
                 (* EOA - Externally Owned Account *)
-                | None -> 
+                | None -> St st'
+                (*
                   if from = rcv then (* Self transfer between accounts => previous state *)
                     St st
                   else
                     St st' (* Simple transfer between accounts (implemented?) *)
-
+                *)
               )
           else (* se non esiste l'account del destinatario: *)
             let rcv_state = { balance = amt; storage = botenv; code = None; } in  (* creo un nuovo account vuoto, con il balance settato a amt *)
@@ -441,28 +444,31 @@ and step_cmd = function
         if lookup_balance txfrom st < txvalue then (* Se il bilancio del mittente è minore del valore richiesto (in Wei) per eseguire la funzione del contratto(?) *)
           Reverted ("sender " ^ txfrom ^ " has not sufficient wei balance") (* Fallisce *)
         else (* Se il mittente ha abbastanza Wei per eseguire la funzione *)
-        let from_state = 
-          { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in (* Modifico lo stato del mittente col bilancio aggiornato *)
-        let to_state  = 
-          { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in (* Modifico lo stato del destinatario col bilancio aggiornato *)
-        let fdecl = Option.get (find_fun_in_sysstate st txto f) in
-        (* setup new stack frame TODO *)
-        let xl = get_var_decls_from_fun fdecl in
-        let xl',vl' =
-          { ty=VarT(AddrBT false); name="msg.sender"; } :: 
-          { ty=VarT(UintBT); name="msg.value"; } :: xl,
-          Addr txfrom :: 
-          Uint txvalue :: txargs
-        in
-        let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
-        let st' = { accounts = st.accounts 
-                      |> bind txfrom from_state
-                      |> bind txto to_state; 
-                    callstack = fr' :: st.callstack;
-                    blocknum = st.blocknum;
-                    active = st.active } in
-        let c = get_cmd_from_fun fdecl in
-        CmdSt(ExecProcCall(c), st')
+          let from_state = 
+            { (st.accounts txfrom) with balance = (st.accounts txfrom).balance - txvalue } in (* Modifico lo stato del mittente col bilancio aggiornato *)
+          let st_tmp = { st with accounts = st.accounts |> bind txfrom from_state } in
+
+          let to_state = 
+            { (st_tmp.accounts txto) with balance = (st_tmp.accounts txto).balance + txvalue } in (* Modifico lo stato del destinatario col bilancio aggiornato *)
+
+          let st_tmp' = { st_tmp with accounts = st_tmp.accounts |> bind txto to_state } in
+
+          let fdecl = Option.get (find_fun_in_sysstate st txto f) in
+          (* setup new stack frame *)
+          let xl = get_var_decls_from_fun fdecl in
+          let xl',vl' =
+            { ty=VarT(AddrBT false); name="msg.sender"; } :: 
+            { ty=VarT(UintBT); name="msg.value"; } :: xl,
+            Addr txfrom :: 
+            Uint txvalue :: txargs
+          in
+          let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
+          let st' = { accounts = st_tmp'.accounts;
+                      callstack = fr' :: st.callstack;
+                      blocknum = st.blocknum;
+                      active = st.active } in
+          let c = get_cmd_from_fun fdecl in
+          CmdSt(ExecProcCall(c), st')
 
     | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value -> 
       let (e_args', st') = step_expr_list (e_args, st) in 

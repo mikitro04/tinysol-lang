@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.2;
 
+/*
+    Simulazione della Call Stack Depth Limit, in situazioni di loop infiniti effettua revert
+*/
+
 contract C {
     address d;
 
@@ -17,14 +21,5 @@ contract D {
 
     function foo() public { payable(c).transfer(25); }
 
-    receive() external payable {
-        // gestione prima di overflow del loop
-        if(x < 70) {        // Cap di iterazioni = n70, oltre 70 va in OverFlow/Revert
-            x += 1;
-            payable(c).transfer(25);
-        } else {
-            x = x;
-        }
-        
-    }
+    receive() external payable { payable(c).transfer(25); }
 }

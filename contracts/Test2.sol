@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.2;
 
+/* 
+    Test chiamata a funzione attivata a catena dalla receive
+*/
+
 contract C { 
     address d;
     constructor(address payable add_) { d = add_; }
     function foo(address add_) public { payable(add_).transfer(10); }
     receive() external payable {
-        // transfer a D => x = 1 += 1 = 2
         d.g();
-        // payable(d).transfer(10);
     }
 }
 

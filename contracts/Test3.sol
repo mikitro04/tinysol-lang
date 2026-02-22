@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.2;
 
+/*
+    Test per vedere se dopo require riga34 reverta tutto (e lo fa)
+*/
+
 contract C {
     address d;
 
