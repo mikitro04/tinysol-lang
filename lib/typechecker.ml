@@ -403,7 +403,7 @@ let typecheck_local_decls (f : ide) (vdl : local_var_decl list) = List.fold_left
 
 
 (* f: Identificatore della funzione / edl: lista delle dichiarazioni delle enum / vdl lista delle dichiarazioni delle variabili *)
-let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (ret : base_type list) = function 
+let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (ret : base_type list) (fdl : fun_decl list) = function 
     | Skip -> Ok()
     
     | Assign(x,e) -> 
@@ -429,17 +429,17 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
           | res1,res2,res3 -> typecheck_result_from_expr_result (res1 >>+ res2 >>+ res3))
 
     | Seq(c1,c2) -> 
-        typecheck_cmd f edl vdl ret c1
+        typecheck_cmd f edl vdl ret fdl c1
         >>
-        typecheck_cmd f edl vdl ret c2
+        typecheck_cmd f edl vdl ret fdl c2
 
     | If(e,c1,c2) -> (match typecheck_expr f edl vdl e with
-          | Ok(BoolConstET true)  -> typecheck_cmd f edl vdl ret c1
-          | Ok(BoolConstET false) -> typecheck_cmd f edl vdl ret c2
+          | Ok(BoolConstET true)  -> typecheck_cmd f edl vdl ret fdl c1
+          | Ok(BoolConstET false) -> typecheck_cmd f edl vdl ret fdl c2
           | Ok(BoolET) -> 
-              typecheck_cmd f edl vdl ret c1
+              typecheck_cmd f edl vdl ret fdl c1
               >>
-              typecheck_cmd f edl vdl ret c2
+              typecheck_cmd f edl vdl ret fdl c2
           | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
           | res -> typecheck_result_from_expr_result res)
 
@@ -462,13 +462,17 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
         typecheck_local_decls f lvdl
         >>
         let vdl' = push_local_decls vdl lvdl in
-        typecheck_cmd f edl vdl' ret c
+        typecheck_cmd f edl vdl' ret fdl c
 
     | ExecBlock(_) -> assert(false) (* should not happen at static time *)
 
     | Decl(_) -> assert(false) (* should not happen after blockify *)
 
-    | ProcCall(_) -> failwith "TODO: ProcCall"
+    (* (destinatario, nome funzione, valore in wei, argomenti) *)
+    | ProcCall((*e_to, f, e_val, arg_list*)_) -> failwith "TODO: ProcCall"
+    (*
+        - controllare arietà
+    *)
 
     | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
 
@@ -502,21 +506,21 @@ let typecheck_return c ret f =
     | _ -> false
   in
   let check = exists_return c in
-  if (ret <> [] && check ||
-    ret = [] && not check) then
+  if (ret <> [] && check (*||
+    ret = [] && not check*)) then
     Ok()
   else
     Error [MissingReturnStat (f)]
 ;;
 
 
-let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
+let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) (fdl : fun_decl list) = function
   | Constr (al,c,_) ->
       no_dup_local_var_decls "constructor" al
       >>
       typecheck_local_decls "constructor" al
       >> 
-      typecheck_cmd "constructor" edl (merge_var_decls vdl al) [] c
+      typecheck_cmd "constructor" edl (merge_var_decls vdl al) [] fdl c
   | Proc (f,al,c,_,__,ret) ->
       no_dup_local_var_decls f al
       >> 
@@ -524,7 +528,7 @@ let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
       >>
       typecheck_return c ret f
       >>
-      typecheck_cmd f edl (merge_var_decls vdl al) ret c
+      typecheck_cmd f edl (merge_var_decls vdl al) ret fdl c
 
 (* dup_first: finds the first duplicate in a list *)
 let rec dup_first (l : 'a list) : 'a option = match l with 
@@ -558,7 +562,7 @@ let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =
   (* no multiply declared functions *)
   no_dup_fun_decls fdl
   >>
-  List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fd) (Ok ()) fdl  
+  List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fdl fd) (Ok ()) fdl  
 
 
 let string_of_typecheck_result = function
