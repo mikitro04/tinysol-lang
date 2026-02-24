@@ -58,7 +58,7 @@ let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typec
   | Error log1,Error log2 -> Error (log1 @ log2)
 
 (* boring cast from expression typechecker result to contract typechecker result*)
-let typeckeck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
+let typecheck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
   match out with
   | Error log -> Error log
   | Ok(_) -> Ok()
@@ -75,6 +75,10 @@ exception EnumOptionNotFound of ide * ide * ide
 exception EnumDupName of ide
 exception EnumDupOption of ide * ide
 exception MapInLocalDecl of ide * ide
+
+(* Our exceptions *)
+exception MissingReturnsDecl of ide
+exception MissingReturnStat of ide
 
 let logfun f s = "(" ^ f ^ ")\t" ^ s 
 
@@ -95,6 +99,11 @@ let string_of_typecheck_error = function
 | EnumDupName x -> "enum " ^ x ^ " is declatred multiple times"
 | EnumDupOption (x,o) -> "enum option " ^ o ^ " is declared multiple times in enum " ^ x
 | MapInLocalDecl (f,x) -> logfun f "mapping " ^ x ^ " not admitted in local declaration" 
+
+(* Prettyprinting of our typechecker errors *)
+| MissingReturnsDecl f -> logfun f "Function declared with 'return' statement but empty or no 'returns' keyword found"
+| MissingReturnStat f -> logfun f "Function have not declared 'return' statement but there is a 'returns' keyword found"
+
 | ex -> Printexc.to_string ex
 
 let exprtype_of_decltype = function
@@ -176,7 +185,7 @@ let no_dup_fun_decls vdl =
   |> dup
   |> fun res -> match res with None -> Ok () | Some x -> Error ([MultipleDecl x])  
 
-let subtype t0 t1 = match t1 with
+let subtype t0 t1 = match t1 with (* converto t0 in t1 *)
   | BoolConstET _ -> (match t0 with BoolConstET _ -> true | _ -> false) 
   | BoolET -> (match t0 with BoolConstET _ | BoolET -> true | _ -> false) 
   | IntConstET _ -> (match t0 with IntConstET _ -> true | _ -> false)
@@ -394,16 +403,16 @@ let typecheck_local_decls (f : ide) (vdl : local_var_decl list) = List.fold_left
 
 
 (* f: Identificatore della funzione / edl: lista delle dichiarazioni delle enum / vdl lista delle dichiarazioni delle variabili *)
-let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = function 
-    | Skip -> Ok ()
-
+let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (ret : base_type list) = function 
+    | Skip -> Ok()
+    
     | Assign(x,e) -> 
         (* the immutable modifier is not checked for the constructor *)
         if f <> "constructor" && is_immutable x (get_state_var_decls vdl) then Error [ImmutabilityError (f,x)]
         else (
           match typecheck_expr f edl vdl e,typecheck_expr f edl vdl (Var x) with
           | Ok(te),Ok(tx) -> if subtype te tx then Ok() else Error [TypeError (f,e,te,tx)]
-          | res1,res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
+          | res1,res2 -> typecheck_result_from_expr_result (res1 >>+ res2)
         )
 
     | Decons(_) -> failwith "TODO: multiple return values"  (* Issue: 12 *)
@@ -417,43 +426,43 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = f
               | MapET(_,txv) when not (subtype tv txv) -> Error [TypeError (f,ev,tv,txv)] 
               | MapET(_,_) -> Ok()
               | _ -> Error [NotMapError (f,Var x)])
-          | res1,res2,res3 -> typeckeck_result_from_expr_result (res1 >>+ res2 >>+ res3))
+          | res1,res2,res3 -> typecheck_result_from_expr_result (res1 >>+ res2 >>+ res3))
 
     | Seq(c1,c2) -> 
-        typecheck_cmd f edl vdl c1
+        typecheck_cmd f edl vdl ret c1
         >>
-        typecheck_cmd f edl vdl c2
+        typecheck_cmd f edl vdl ret c2
 
     | If(e,c1,c2) -> (match typecheck_expr f edl vdl e with
-          | Ok(BoolConstET true)  -> typecheck_cmd f edl vdl c1
-          | Ok(BoolConstET false) -> typecheck_cmd f edl vdl c2
+          | Ok(BoolConstET true)  -> typecheck_cmd f edl vdl ret c1
+          | Ok(BoolConstET false) -> typecheck_cmd f edl vdl ret c2
           | Ok(BoolET) -> 
-              typecheck_cmd f edl vdl c1
+              typecheck_cmd f edl vdl ret c1
               >>
-              typecheck_cmd f edl vdl c2
+              typecheck_cmd f edl vdl ret c2
           | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
-          | res -> typeckeck_result_from_expr_result res)
+          | res -> typecheck_result_from_expr_result res)
 
     | Send(ercv,eamt) -> (match typecheck_expr f edl vdl ercv with
           | Ok(AddrET(true)) -> Ok() (* can only send to payable addresses *)
           | Ok(t_ercv) -> Error [TypeError(f,ercv,t_ercv,AddrET(true))]
-          | res -> typeckeck_result_from_expr_result res) 
+          | res -> typecheck_result_from_expr_result res) 
           >>
           (match typecheck_expr f edl vdl eamt with
           | Ok(t_eamt) when subtype t_eamt UintET -> Ok()
           | Ok(t_eamt) -> Error [TypeError(f,eamt,t_eamt,UintET)]
-          | res -> typeckeck_result_from_expr_result res)
+          | res -> typecheck_result_from_expr_result res)
 
     | Req(e) -> (match typecheck_expr f edl vdl e with
           | Ok(BoolET) -> Ok() 
           | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
-          | res -> typeckeck_result_from_expr_result res)
+          | res -> typecheck_result_from_expr_result res)
 
     | Block(lvdl,c) ->
         typecheck_local_decls f lvdl
         >>
         let vdl' = push_local_decls vdl lvdl in
-        typecheck_cmd f edl vdl' c
+        typecheck_cmd f edl vdl' ret c
 
     | ExecBlock(_) -> assert(false) (* should not happen at static time *)
 
@@ -463,7 +472,42 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = f
 
     | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
 
-    | Return(_) -> failwith "TODO: Return"
+    | Return(el) ->
+      match ret with
+        | [] -> Error [MissingReturnsDecl f]
+        | [single_returns] -> let returnsET = (exprtype_of_decltype single_returns) in (
+          match el with
+            | [] -> failwith "Should not happen: Function declared with 'returns' but no 'return' statement found"
+            | [expr_return] -> (
+                  match (typecheck_expr f edl vdl expr_return) with
+                  | Ok(et) -> if (subtype et returnsET) then 
+                                Ok() 
+                              else 
+                                Error [TypeError (f, expr_return, et, returnsET)]
+                  | Error errL -> Error errL
+                )
+            | _ -> failwith "Issue #12: functions returning multiple values"
+          )
+        | _ -> failwith "Issue #12: function declared with multiple return values"
+
+
+
+let typecheck_return c ret f = 
+  let rec exists_return (c : cmd) : bool =
+    match c with
+    | Return (_) -> true
+    | Seq (c1, c2) -> exists_return c1 || exists_return c2
+    | If (_, c1, c2) -> exists_return c1 && exists_return c2
+    | Block (_, c1) -> exists_return c1
+    | _ -> false
+  in
+  let check = exists_return c in
+  if (ret <> [] && check ||
+    ret = [] && not check) then
+    Ok()
+  else
+    Error [MissingReturnStat (f)]
+;;
 
 
 let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
@@ -472,13 +516,15 @@ let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
       >>
       typecheck_local_decls "constructor" al
       >> 
-      typecheck_cmd "constructor" edl (merge_var_decls vdl al) c
-  | Proc (f,al,c,_,__,_) ->
+      typecheck_cmd "constructor" edl (merge_var_decls vdl al) [] c
+  | Proc (f,al,c,_,__,ret) ->
       no_dup_local_var_decls f al
       >> 
       typecheck_local_decls f al
       >>
-      typecheck_cmd f edl (merge_var_decls vdl al) c
+      typecheck_return c ret f
+      >>
+      typecheck_cmd f edl (merge_var_decls vdl al) ret c
 
 (* dup_first: finds the first duplicate in a list *)
 let rec dup_first (l : 'a list) : 'a option = match l with 

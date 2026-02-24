@@ -244,7 +244,7 @@ opt_id_decons:
 
 nonseq_cmd:
   | SKIP; CMDSEP;  { Skip }
-  | REQ; e = expr; CMDSEP; { Req(e) } 
+  | REQ; e = expr; CMDSEP; { Req(e) }
   | RETURN; LPAREN; el = separated_nonempty_list(ARGSEP, expr); RPAREN; CMDSEP; { Return(el) } 
   | RETURN; e = expr; CMDSEP; { Return([e]) } 
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
@@ -300,7 +300,7 @@ fun_decl:
   /* constructor(al) payable? { c } */ 
   | CONSTR; LPAREN; al = formal_args; RPAREN; m = opt_fun_mutability_t; LBRACE; c = opt_cmd; RBRACE { Constr(al,c,m) }
   /* function f(al) [public|private]? payable? returns(r)? { c } */
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,fst fmod,snd fmod,ret) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,fst fmod,snd fmod,ret) }      /* f = ide funzione, al = argomenti formali, c = corpo funzione, fmod = (coppia di visibilità * mutabilità), ret = base_type list */
   | RECEIVE; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc("receive",al,c,fst fmod,snd fmod,ret) }
 ;
 

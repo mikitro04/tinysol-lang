@@ -56,7 +56,7 @@ type expr =
   | ContractCast of ide * expr  (*  *)
 
   (* Function calls *)
-  | FunCall of expr * ide * expr * expr list
+  | FunCall of expr * ide * expr * expr list        (* IndirizzoMittente, NomeFunzione, ValoreInWei, ListaArgomenti *)
   | ExecFunCall of cmd  (* Runtime only: c is the cmd being reduced *)
     
 (* Abstract syntax of commands *)

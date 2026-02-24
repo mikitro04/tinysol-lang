@@ -3,11 +3,11 @@ pragma solidity >= 0.8.2;
 
 contract Bank {
     int y;
+
     mapping (address user => uint credit) credits;
 
     function deposit() public payable {
         credits[msg.sender] += msg.value;
-        x = 4;
     }
 
     function withdraw(uint amount) public {
