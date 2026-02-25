@@ -506,6 +506,13 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
         )
       (* Controllo della validità degli argomenti singoli, dell'arità e del type match *)
       ) >> (
+        List.fold_left (fun acc expr -> (
+          match typecheck_expr f edl vdl expr with
+          | Error log -> acc >> Error log
+          | Ok(_) -> acc
+          )
+        ) (Ok()) e_args
+      ) >> (
         match e_to with
         | This -> (
           match find_fun_in_decl_list fdl g with
@@ -517,8 +524,8 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
               List.fold_left2 (fun acc expr arg ->
                 let expr_res = typecheck_expr f edl vdl expr in
                 match expr_res with
-                | Error log -> acc >> Error log
-                | Ok exprET ->
+                | Error(_) -> acc
+                | Ok(exprET) ->
                   let argET = (
                     match arg.ty with
                       | VarT t -> exprtype_of_decltype t
@@ -532,34 +539,18 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
           )
         )
         | t -> (
+          (* smembrare e capire ogni singolo caso di typecheck_expr
+          per capire da dove sbucano fuori i contratti, suddividere
+          meglio in casi e testare prima con failwith poi con Ok()
+          nei casi corretti  *)
           match typecheck_expr f edl vdl t with
-          | Ok(AddrET _) | Ok(ContractET _) -> 
-            List.fold_left (fun acc expr -> (
-              match typecheck_expr f edl vdl expr with
-              | Error log -> acc >> Error log
-              | Ok(_) -> acc
-              )
-            ) (Ok()) e_args
-          | _ -> failwith "should not happen"
+          | Ok(AddrET _) -> Ok()
+          | Ok(ContractET _) -> Error [failwith"contratto"]
+          | Ok(_) -> Error [failwith"tipo timido"]
+          | Error err -> Error err
         )
       )
-
-
-
-
-                (*
-                >> (
-        
-      (* Controllo del proprietario della funzione *)
-      )
-                *)
-
-
-
-
-
-
-
+      
     
     (*| ProcCall(e_to, g, e_val, e_args) -> let gay = "gay" in failwith gay(
       let accErr = Ok() in (

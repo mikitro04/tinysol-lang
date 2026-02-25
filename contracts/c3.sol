@@ -7,8 +7,10 @@ contract C3 {
     /* NON TOCCARE */
     int x;
 
-    x pisellino;
+    int pisello;
     C c;
+    merda m;
+    address pistacchio;
 
     mapping (address => uint) mapDecl;
     
@@ -79,6 +81,6 @@ contract C3 {
         // BUG 2: Argomenti esterni ignorati.
         // Poiché non è 'This', il typechecker non controlla l'arità (3 invece di 2)
         // né il tipo degli argomenti. Questo passa senza errori!
-        this.h{value: false}(false*false, 1);
+        "0xC".target{value: false}(false*false, 1);
     }
 }
