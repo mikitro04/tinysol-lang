@@ -1,10 +1,13 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity <= 0.8;
 
+
 contract C3 {
 
     /* NON TOCCARE */
-    uint x;
+    int x;
+
+    x pisellino;
     C c;
 
     mapping (address => uint) mapDecl;
@@ -30,17 +33,17 @@ contract C3 {
     // VARIABILI NOSTRE
     // bool y = true;okkkkkkkkkkkk
     // address a = "ciao";
-    mapping (address => uint) mapAAAAAAA;
+    // mapping (address => uint) mapAAAAAAA;
     // function f() public returns(uint) { int y; return x; }
-    function g(int b) public { skip; }
+    // function g(int b) public { skip; }
     // function h() public returns(int) { return 1; }
 
     // NOSTRI TEST
 
     // function f0() public returns(int) { return f.g(); }
     // function f1() public { x = c.g(); }         // exception Failure("TODO: FunCall")
-    function f1v2() public { this.g(mapAAAAAAA); }           // exception Failure("TODO: ProcCall")
-    // function f2() public { x = c.g{value:1+2}(1,true); }   
+    // function f1v2() public { this.g(mapAAAAAAA); }           // exception Failure("TODO: ProcCall")
+    // function f2() public { c.g{value:2-4}(1,true); }   
     // function f3() public { x = c.g{value:x}(1+1); }   
     // function f4() public { return x; }   
     // function f5() public { if (1+1>1) return x; else return 2; }   
@@ -53,4 +56,29 @@ contract C3 {
     // function f10() public returns(int) { }
     // function f11() public returns(address) { skip; }
     // function f12() public returns(address payable) { skip; }
+
+    function target(uint a, bool b) public {
+        skip;
+    }
+
+    // function test_shadowing() public {
+    //     // BUG 1: Shadowing.
+    //     // L'errore viene riportato in (target) invece che in (test_shadowing).
+    //     this.target(true, true, true);
+    // }
+
+
+    // function test_short_circuit() public {
+    //     // BUG 3: Short-circuiting.
+    //     // L'errore sul 'value' blocca il controllo degli argomenti.
+    //     // Vedremo solo l'errore su 'true' (value), ma non quello su '20' (che dovrebbe essere bool).
+    //     this.target{value: y}(10, 20);
+    // }
+    
+    function test_external_args_ignored() public {
+        // BUG 2: Argomenti esterni ignorati.
+        // Poiché non è 'This', il typechecker non controlla l'arità (3 invece di 2)
+        // né il tipo degli argomenti. Questo passa senza errori!
+        this.h{value: false}(false*false, 1);
+    }
 }

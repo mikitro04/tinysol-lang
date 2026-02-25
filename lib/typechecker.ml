@@ -79,8 +79,8 @@ exception MapInLocalDecl of ide * ide
 (* Our exceptions *)
 exception MissingReturnsDecl of ide
 exception MissingReturnStat of ide
-exception FuncNotFound of ide
-exception ArityArgsProblem of ide
+exception FuncNotFound of ide * ide
+exception ArityArgsProblem of ide * ide * int * int
 
 let logfun f s = "(" ^ f ^ ")\t" ^ s 
 
@@ -103,10 +103,10 @@ let string_of_typecheck_error = function
 | MapInLocalDecl (f,x) -> logfun f "mapping " ^ x ^ " not admitted in local declaration" 
 
 (* Prettyprinting of our typechecker errors *)
-| MissingReturnsDecl f -> logfun f "Function declared with 'return' statement but empty or no 'returns' keyword found"
-| MissingReturnStat f -> logfun f "Function have not declared 'return' statement but there is a 'returns' keyword found"
-| FuncNotFound f -> logfun f "Function is not declared"
-| ArityArgsProblem f -> logfun f "Number of args mismatch"
+| MissingReturnsDecl f -> logfun f "function declared with 'return' statement but empty or no 'returns' keyword found"
+| MissingReturnStat f -> logfun f "function have not declared 'return' statement but there is a 'returns' keyword found"
+| FuncNotFound (f, g) -> logfun f "function '" ^ g ^ "' is not declared"
+| ArityArgsProblem (f, g, n1, n2) -> logfun f "function '" ^ g ^ "' expects " ^ string_of_int n1 ^ " arguments but " ^ string_of_int n2 ^ " were provided"
 
 | ex -> Printexc.to_string ex
 
@@ -415,7 +415,7 @@ let rec find_fun_in_decl_list (fdl : fun_decl list) (f : ide) : (local_var_decl 
     | _ -> None
 ;;
 
-let rec useInfixOp (a : typecheck_expr_result list) =
+(* let rec useInfixOp (a : typecheck_expr_result list) =
     match a with
     | [] -> Ok()
     | h::t -> (
@@ -423,7 +423,7 @@ let rec useInfixOp (a : typecheck_expr_result list) =
       | Ok(_) -> useInfixOp t
       | Error(l) -> Error(l) >> (useInfixOp t)
     )
-;;
+;; *)
 
 (* f: Identificatore della funzione / edl: lista delle dichiarazioni delle enum / vdl lista delle dichiarazioni delle variabili *)
 let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (ret : base_type list) (fdl : fun_decl list) = function 
@@ -492,82 +492,148 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
     | Decl(_) -> assert(false) (* should not happen after blockify *)
 
     (* (destinatario, nome funzione, valore in wei, argomenti alla chiamata) *)
-    (* | ProcCall(e_to, f, e_val, arg_list) -> ( *)
-    (* 
-        (
-            match find_fun_in_decl_list fdl f with
-            | Some _ -> failwith "da fare"
-            | None -> failwith "la funzione non esiste"
+    | ProcCall(e_to, g, e_val, e_args) -> 
+      let accErr = Ok() in 
+      (* Controllo dei wei *)
+      accErr >> (
+        match typecheck_expr f edl vdl e_val with
+        | Error err -> Error err
+        | Ok(weiT) -> (
+          if (not (subtype weiT UintET)) then
+            Error [TypeError(f, e_val, weiT, UintET)]
+          else
+            Ok()
         )
-    *)
-    | ProcCall(e_to, f, _, e_args) -> (
-    (* Controlliamo il proprietario della funzione *)
-      match e_to with
+      (* Controllo della validità degli argomenti singoli, dell'arità e del type match *)
+      ) >> (
+        match e_to with
         | This -> (
-          (* Controlliamo che la firma della funzione esista all'interno di questo contratto *)
-          match find_fun_in_decl_list fdl f with
+          match find_fun_in_decl_list fdl g with
+          | None -> Error [FuncNotFound (f, g)]
           | Some (formal_args, _) -> (
-            (* Controlliamo l'arità *)
-            (* if (subtype e_val UintET) then Ok() else *)
-            if List.length e_args = List.length formal_args then
-              (* Convertiamo i parametri passati e i parametri formali della funzione in ExpressionType *)
-
-              
+            if List.length e_args <> List.length formal_args then
+              Error [ArityArgsProblem (f, g, List.length formal_args, List.length e_args)]
+            else (
               List.fold_left2 (fun acc expr arg ->
                 let expr_res = typecheck_expr f edl vdl expr in
                 match expr_res with
-                  | Ok exprET ->
-                    let argET = (
-                      match arg.ty with
-                        | VarT t -> exprtype_of_decltype t
-                        | MapT _ -> failwith "Should not happen🫵😹") in
-                    if subtype exprET argET then
-                      acc
-                    else
-                      acc >> Error [TypeError(f, expr, exprET, argET)]
-                  | Error log -> acc >> Error log
+                | Error log -> acc >> Error log
+                | Ok exprET ->
+                  let argET = (
+                    match arg.ty with
+                      | VarT t -> exprtype_of_decltype t
+                      | MapT _ -> failwith "should not happen") in
+                  if subtype exprET argET then
+                    acc
+                  else
+                    acc >> Error [TypeError(f, expr, exprET, argET)]
               ) (Ok()) e_args formal_args
-               
-
-
-              (*
-              let argsET = e_args 
-                |> List.map (typecheck_expr f edl vdl) (* Ok() | Error() (>>)  *)
-                (* |> List.map (fun x -> match x with | Ok(bt) -> bt | _ -> failwith "should not happen") *)
-              in
-              let formal_argsET = formal_args 
-                |> List.map (fun x -> x.ty) 
-                |> List.map (fun x -> match x with | VarT b -> b | _ -> failwith "passing a map (should not happen)")
-                |> List.map (exprtype_of_decltype) in (* argsET deve essere compatibile con formal_arg_list *)
-
-              let errors = useInfixOp argsET in
-              match errors with
-              | Error(_) -> errors
-              | _ ->
-                if (List.for_all2 subtype (argsET |> List.map (fun x -> match x with | Ok(bt) -> bt | _ -> failwith "should not happen")) formal_argsET) then
-                  Ok()
-                else 
-                  failwith "pouh"
-                  (* Error([TypeError (f, e)]) Type mismatch *)
-              (* failwith ("THEN, formal_args: " ^ string_of_int (List.length formal_args) ^ ", arg_list: " ^ (string_of_int (List.length (arg_list)))) *)
-             *)
-
-            else
-              Error [ArityArgsProblem (f)]
+            )
           )
-          | None -> Error [FuncNotFound (f)]
         )
-        | _ -> Ok()
+        | t -> (
+          match typecheck_expr f edl vdl t with
+          | Ok(AddrET _) | Ok(ContractET _) -> 
+            List.fold_left (fun acc expr -> (
+              match typecheck_expr f edl vdl expr with
+              | Error log -> acc >> Error log
+              | Ok(_) -> acc
+              )
+            ) (Ok()) e_args
+          | _ -> failwith "should not happen"
+        )
       )
 
-      
+
+
+
+                (*
+                >> (
+        
+      (* Controllo del proprietario della funzione *)
+      )
+                *)
+
+
+
+
+
+
+
+    
+    (*| ProcCall(e_to, g, e_val, e_args) -> let gay = "gay" in failwith gay(
+      let accErr = Ok() in (
+      match typecheck_expr f edl vdl e_val with
+      | Error err -> accErr >> Error err
+      | Ok(weiT) -> accErr >> (
+        if (not (subtype weiT UintET)) then
+          Error [TypeError(f, e_val, weiT, UintET)]
+        else
+          Ok()
+        )
+      ) >> (
+        (* Controlliamo il proprietario della funzione *)
+        match e_to with
+        | This -> (
+          (* Controlliamo che la firma della funzione esista all'interno di questo contratto *)
+          match find_fun_in_decl_list fdl g with
+          | None -> Error [FuncNotFound (f, g)]
+          | Some (formal_args, _) -> (
+            (* Controlliamo l'arità *)
+            if List.length e_args <> List.length formal_args then
+              Error [ArityArgsProblem (f, g, List.length formal_args, List.length e_args)]
+            else (
+              (* Convertiamo i parametri passati e i parametri formali della funzione in ExpressionType *)                
+              List.fold_left2 (fun acc expr arg ->
+                let expr_res = typecheck_expr f edl vdl expr in
+                match expr_res with
+                | Error log -> acc >> Error log
+                | Ok exprET ->
+                  let argET = (
+                    match arg.ty with
+                      | VarT t -> exprtype_of_decltype t
+                      | MapT _ -> failwith "should not happen") in
+                  if subtype exprET argET then
+                    acc
+                  else
+                    acc >> Error [TypeError(f, expr, exprET, argET)]
+              ) (accErr) e_args formal_args
+            )
+          )
+        )
+        | t -> Error [MissingReturnsDecl("oOoOoOoOoOo")] >> (
+          (
+            match typecheck_expr f edl vdl t with
+            | Ok(AddrET _) | Ok(ContractET _) -> Error [MissingReturnsDecl("bagassa 3 euro")]
+            | _ -> failwith "Pyrex Baby negro di merda! ok"
+          ) 
+
+        )
+      )
+    )
+    *)
     (*
-        - controllare se il contratto esiste
-        - la funzione chiamata non esiste dentro il contratto chiamato
-        - controllare arietà
-        - controllare la compatibilità tra parametri passati e parameti accetati (con subtype)
-        - controllare il valore in wei (e_val)
-     *)
+    let argsET = e_args 
+      |> List.map (typecheck_expr f edl vdl) (* Ok() | Error() (>>)  *)
+      (* |> List.map (fun x -> match x with | Ok(bt) -> bt | _ -> failwith "should not happen") *)
+    in
+    let formal_argsET = formal_args 
+      |> List.map (fun x -> x.ty) 
+      |> List.map (fun x -> match x with | VarT b -> b | _ -> failwith "passing a map (should not happen)")
+      |> List.map (exprtype_of_decltype) in (* argsET deve essere compatibile con formal_arg_list *)
+
+    let errors = useInfixOp argsET in
+    match errors with
+    | Error(_) -> errors
+    | _ ->
+      if (List.for_all2 subtype (argsET |> List.map (fun x -> match x with | Ok(bt) -> bt | _ -> failwith "should not happen")) formal_argsET) then
+        Ok()
+      else 
+        failwith "pouh"
+        (* Error([TypeError (f, e)]) Type mismatch *)
+    (* failwith ("THEN, formal_args: " ^ string_of_int (List.length formal_args) ^ ", arg_list: " ^ (string_of_int (List.length (arg_list)))) *)
+  *)
+  
 
     | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
 
@@ -576,7 +642,7 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) (re
         | [] -> Error [MissingReturnsDecl f]
         | [single_returns] -> let returnsET = (exprtype_of_decltype single_returns) in (
           match el with
-            | [] -> failwith "Should not happen: Function declared with 'returns' but no 'return' statement found"
+            | [] -> failwith "should not happen: Function declared with 'returns' but no 'return' statement found"
             | [expr_return] -> (
                   match (typecheck_expr f edl vdl expr_return) with
                   | Ok(et) -> if (subtype et returnsET) then 
@@ -671,11 +737,10 @@ let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =
   no_dup_fun_decls fdl
   >>
   List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fdl fd) (Ok ()) fdl
-  |>
-  rm_dup_err 
+  (* |>
+  rm_dup_err  *)
 
 let string_of_typecheck_result = function
   Ok() -> "Typecheck ok"
 | Error log -> List.fold_left 
   (fun acc ex -> acc ^ (if acc="" then "" else "\n") ^ string_of_typecheck_error ex) "" log
-
