@@ -7,12 +7,13 @@ contract C3 {
     /* NON TOCCARE */
     int x;
 
-    int pisello;
+    // int pisello;
     C c;
-    merda m;
-    address pistacchio;
+    // merda m;
+    // Pompeddu paperino;
+    // address pistacchio;
 
-    mapping (address => uint) mapDecl;
+    // mapping (address => uint) mapDecl;
     
 
     // Prof tests NON TOCCARE!!!                                                    // (fallisce in Return(_) / fallisce in typecheck return)
@@ -42,8 +43,12 @@ contract C3 {
 
     // NOSTRI TEST
 
+    function g() public {
+        skip;
+    }
+
     // function f0() public returns(int) { return f.g(); }
-    // function f1() public { x = c.g(); }         // exception Failure("TODO: FunCall")
+    function f1() public { x = this.g(1); }         // exception Failure("TODO: FunCall")
     // function f1v2() public { this.g(mapAAAAAAA); }           // exception Failure("TODO: ProcCall")
     // function f2() public { c.g{value:2-4}(1,true); }   
     // function f3() public { x = c.g{value:x}(1+1); }   
@@ -59,9 +64,13 @@ contract C3 {
     // function f11() public returns(address) { skip; }
     // function f12() public returns(address payable) { skip; }
 
-    function target(uint a, bool b) public {
-        skip;
-    }
+    // function target(uint a, bool b) public {
+    //     skip;
+    // }
+
+    // function g1() public returns(int) {
+    //     return 1;
+    // }
 
     // function test_shadowing() public {
     //     // BUG 1: Shadowing.
@@ -77,10 +86,10 @@ contract C3 {
     //     this.target{value: y}(10, 20);
     // }
     
-    function test_external_args_ignored() public {
-        // BUG 2: Argomenti esterni ignorati.
-        // Poiché non è 'This', il typechecker non controlla l'arità (3 invece di 2)
-        // né il tipo degli argomenti. Questo passa senza errori!
-        "0xC".target{value: false}(false*false, 1);
-    }
+    // function test_external_args_ignored() public {
+    //     // BUG 2: Argomenti esterni ignorati.
+    //     // Poiché non è 'This', il typechecker non controlla l'arità (3 invece di 2)
+    //     // né il tipo degli argomenti. Questo passa senza errori!
+    //     c.target{value: 1}(false, 1);
+    // }
 }
