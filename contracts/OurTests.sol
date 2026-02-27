@@ -5,6 +5,8 @@ contract C {
 /* Dichiarazione Variabili */
     bool flag;
     C1 c1;
+    int returnInt;
+    bool returnBool;
 
     
 /* RETURN */
@@ -89,8 +91,7 @@ contract C {
     }
 
     // Variabili target per provare i TypeMismatch nell'assegnamento
-    int returnInt;
-    bool returnBool;
+    
 
     // TypeError Wei
     // function f0() public { returnInt = this.targetFun{value: 1}(); }                                         // MUST PASS
@@ -115,6 +116,7 @@ contract C {
     // Type Mismatch Ritorno (Valid Params ma Assegnamento ad una var di tipo errato)
     // function f12() public { returnBool = this.targetFun(); }
     // function f13() public { returnInt = this.targetFunArgs(1, true); }
+    function f13() public { returnInt = this.targetProc(); }
 
     // Errori Espressione Chiamante + NotInThisContract
     // function f14() public { returnInt = "0xC".targetFun(); }

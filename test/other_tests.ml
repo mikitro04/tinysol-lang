@@ -1,7 +1,7 @@
 open Semantics
+open Typechecker
 
 (*
-open Typechecker
 
 let%test "test_shortcut_1" = test_exec_tx
   "contract C {  
@@ -419,3 +419,80 @@ let%test "test_6_issue_7" = test_exec_fun
   ("0xC", "this.balance==50"); 
   ("0xD", "this.balance==50 && x==2")
 ]
+
+
+
+
+
+
+
+(******************************************************************************)
+(*                             Custom Test - Issue 9                          *)
+(******************************************************************************)
+
+
+let%test "test_1_issue_9" = test_typecheck
+  "contract C {
+      uint x;
+      function f() public { return 1; }
+  }"
+  false
+
+let%test "test_2_issue_9" = test_typecheck
+  "contract C {
+    function f() public returns() { return -1; }
+  }"
+  false
+
+let%test "test_3_issue_9" = test_typecheck
+  "contract C {
+    function f() public returns(uint) { return -1; }
+  }"
+  false
+
+let%test "test_4_issue_9" = test_typecheck
+  "contract C {
+    function f() public returns(int) { return -1; }
+  }"
+  true
+
+let%test "test_5_issue_9" = test_typecheck
+  "contract C {
+    function f() public returns() { int x; x = 1; }
+  }"
+  true
+
+
+
+
+let%test "test_6_issue_9" = test_typecheck
+  "contract C {
+    function f() public returns() { return 1; }
+    function g() public returns(bool) { bool b; int x; b = true; x = this.f(); if (x == 1) { return b; } else { return false; } }
+  }"
+  false
+
+let%test "test_7_issue_9" = test_typecheck
+  "contract C {
+    function f() public returns(int) { return 1; }
+    function g() public returns(bool) { bool b; int x; b = true; x = this.f(); if (x == 1) { return b; } else { return false; } }
+  }"
+  true
+
+let%test "test_8_issue_9" = test_typecheck
+  "contract C {
+    function h() public returns(int) { return -1; }
+    function l() public returns(bool) { return false; }
+    function f() public returns() { return 1; }
+    function g() public returns(bool) { bool b; int x; b = true; x = this.f(); if (x == 1) { x = this.h(); } else { x = this.l(); } return (x == -1); }
+  }"
+  false
+
+let%test "test_9_issue_9" = test_typecheck
+  "contract C {
+    function h() public returns(int) { return -1; }
+    function l() public returns(int) { return 5; }
+    function f() public returns(int) { return 1; }
+    function g() public returns(bool) { bool b; int x; b = true; x = this.f(); if (x == 1) { x = this.h(); } else { x = this.l(); } return (x == -1); }
+  }"
+  true
