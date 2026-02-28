@@ -83,12 +83,8 @@ contract C {
 
 /* FUNCALL */
     // Funzioni target per i test FunCall
-    function targetFun() public returns (int) {
-        return 1;
-    }
-    function targetFunArgs(int a, bool b) public returns (bool) {
-        return b;
-    }
+    function targetFun() public returns (int) { return 1; }
+    function targetFunArgs(int a, bool b) public returns (bool) { return b; }
 
     // Variabili target per provare i TypeMismatch nell'assegnamento
     
@@ -108,29 +104,28 @@ contract C {
     // function f7() public { returnBool = this.targetFunArgs(1); }
     // function f8() public { returnBool = this.targetFunArgs(1, true, 3); }
 
-    // Type Mismatch Argomenti (errori su passaggio parametri e propagati ad Assign)
-    // function f9()  public { returnBool = this.targetFunArgs(true, true); }
+    // Type Mismatch Argomenti (errori su passaggio parametri, bloccano il check dell'Assign)
+    // function f9()  public { returnBool = this.targetFunArgs(false, true); }
     // function f10() public { returnBool = this.targetFunArgs(1, 2); }
     // function f11() public { returnBool = this.targetFunArgs("0xC", 1); }
 
     // Type Mismatch Ritorno (Valid Params ma Assegnamento ad una var di tipo errato)
     // function f12() public { returnBool = this.targetFun(); }
     // function f13() public { returnInt = this.targetFunArgs(1, true); }
-    function f13() public { returnInt = this.targetProc(); }
+    // function f14() public { returnInt = this.targetProc(); }
 
     // Errori Espressione Chiamante + NotInThisContract
-    // function f14() public { returnInt = "0xC".targetFun(); }
-    // function f15() public { returnBool = c1.targetFunArgs(1, true); }
-    // function f16() public { returnBool = c.targetFunArgs(1, true); }
-    // function f17() public { returnBool = flag.targetFunArgs(1, true); }
-    // function f18() public { returnInt = 1.targetFun(); }
+    // function f15() public { returnInt = "0xC".targetFun(); }
+    // function f16() public { returnBool = c1.targetFunArgs(1, true); }
+    // function f17() public { returnBool = c.targetFunArgs(1, true); }
+    // function f18() public { returnBool = flag.targetFunArgs(1, true); }
+    // function f19() public { returnInt = 1.targetFun(); }
 
     // Combinazioni di errori concatenati
-    // function f19() public { returnBool = flag.targetFunArgs{value: false}(1*false); }
-    // function f20() public { returnBool = c1.targetFunArgs{value: false}(1 && 2); }
-    // function f21() public { returnBool = c.targetFunArgs{value: -1}(true-false); }
-    // function f22() public { returnInt = "0xC".targetFun{value: -10}(1); }
+    // function f20() public { returnBool = flag.targetFunArgs{value: false}(1*false); }
+    // function f21() public { returnBool = c1.targetFunArgs{value: "0xD"}(1 && 2); }
+    // function f22() public { returnBool = c.targetFunArgs{value: -1}(true-false); }
+    // function f23() public { returnInt = "0xC".targetFun{value: -10}(1); }
 
     /*  */
-
 }
